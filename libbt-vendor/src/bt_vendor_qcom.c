@@ -60,8 +60,8 @@ extern int is_hw_ready();
 extern int rome_soc_init(int fd, char *bdaddr);
 extern int check_embedded_mode(int fd);
 extern int rome_get_addon_feature_list(int fd);
-extern int rome_ver;
 extern int enable_controller_log(int fd, unsigned char req);
+extern int chipset_ver;
 /******************************************************************************
 **  Variables
 ******************************************************************************/
@@ -866,9 +866,9 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                      ALOGV("%s: received the socket fd: %d is_ant_req: %d\n",
                                                                  __func__, fd, is_ant_req);
                                      if((strcmp(emb_wp_mode, "true") == 0) && !is_ant_req) {
-                                         if (rome_ver >= ROME_VER_3_0) {
+                                         if (chipset_ver >= ROME_VER_3_0) {
                                              /*  get rome supported feature request */
-                                             ALOGE("%s: %x08 %0x", __FUNCTION__,rome_ver, ROME_VER_3_0);
+                                             ALOGE("%s: %x08 %0x", __FUNCTION__,chipset_ver, ROME_VER_3_0);
                                              rome_get_addon_feature_list(fd);
                                          }
                                      }

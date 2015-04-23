@@ -69,13 +69,13 @@ FILE *file;
 unsigned char *phdr_buffer;
 unsigned char *pdata_buffer = NULL;
 patch_info rampatch_patch_info;
-int rome_ver = ROME_VER_UNKNOWN;
+int chipset_ver = ROME_VER_UNKNOWN;
 unsigned char gTlv_type;
 unsigned char gTlv_dwndCfg;
 static unsigned int wipower_flag = 0;
 static unsigned int wipower_handoff_ready = 0;
-char *rampatch_file_path;
-char *nvm_file_path;
+char *rampatch_file_path = NULL;
+char *nvm_file_path = NULL;
 char *fw_su_info = NULL;
 unsigned short fw_su_offset =0;
 extern char enable_extldo;
@@ -130,6 +130,7 @@ int get_vs_hci_event(unsigned char *rsp)
     unsigned short patchversion = 0;
     char build_label[255];
     int build_lbl_len;
+    unsigned short buildversion = 0;
 
     if( (rsp[EVENTCODE_OFFSET] == VSEVENT_CODE) || (rsp[EVENTCODE_OFFSET] == EVT_CMD_COMPLETE))
         ALOGI("%s: Received HCI-Vendor Specific event", __FUNCTION__);
@@ -164,7 +165,7 @@ int get_vs_hci_event(unsigned char *rsp)
                                             rsp[PATCH_PATCH_VER_OFFSET] )));
 
                 /* ROM Build Version indicates ROM build version like 1.0/1.1/2.0 */
-                ALOGI("\t Current ROM Build Version\t: 0x%04x", rome_ver =
+                ALOGI("\t Current ROM Build Version\t: 0x%04x", buildversion =
                     (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET + 1] << 8 |
                                             rsp[PATCH_ROM_BUILD_VER_OFFSET] ));
 
@@ -181,7 +182,7 @@ int get_vs_hci_event(unsigned char *rsp)
                 if (NULL != (btversionfile = fopen(BT_VERSION_FILEPATH, "wb"))) {
                     fprintf(btversionfile, "Bluetooth Controller Product ID    : 0x%08x\n", productid);
                     fprintf(btversionfile, "Bluetooth Controller Patch Version : 0x%04x\n", patchversion);
-                    fprintf(btversionfile, "Bluetooth Controller Build Version : 0x%04x\n", rome_ver);
+                    fprintf(btversionfile, "Bluetooth Controller Build Version : 0x%04x\n", buildversion);
                     fprintf(btversionfile, "Bluetooth Controller SOC Version   : 0x%08x\n", soc_id);
                     fclose(btversionfile);
                 }else {
@@ -191,7 +192,7 @@ int get_vs_hci_event(unsigned char *rsp)
                 /* Rome Chipset Version can be decided by Patch version and SOC version,
                 Upper 2 bytes will be used for Patch version and Lower 2 bytes will be
                 used for SOC as combination for BT host driver */
-                rome_ver = (rome_ver << 16) | (soc_id & 0x0000ffff);
+                chipset_ver = (productid << 24) | (buildversion << 8) | (soc_id & 0x0000ffff);
                 break;
             case EDL_TVL_DNLD_RES_EVT:
             case EDL_CMD_EXE_STATUS_EVT:
@@ -784,6 +785,13 @@ error:
     return err;
 }
 
+unsigned char is_sibs_enabled ()
+{
+   char value[PROPERTY_VALUE_MAX] = {'\0'};
+   property_get("persist.service.bdroid.sibs", value, "true");
+   return ((strcmp(value, "true") == 0)? TRUE: FALSE);
+}
+
 int rome_rampatch_reset(int fd)
 {
     int size, err = 0, flags;
@@ -910,6 +918,17 @@ int rome_get_tlv_file(char *file_path)
                     *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
             }
 
+            /* Change SIBS setting */
+            if(!is_sibs_enabled()) {
+                if(nvm_ptr->tag_id == 17){
+                    *nvm_byte_ptr = ((*nvm_byte_ptr) & ~(0x80));
+                }
+
+                if(nvm_ptr->tag_id == 27){
+                    *nvm_byte_ptr = ((*nvm_byte_ptr) & ~(0x01));
+                }
+            }
+
             for(i =0;(i<nvm_ptr->tag_len && (i*3 + 2) <PRINT_BUF_SIZE);i++)
                 snprintf((char *) data_buf, PRINT_BUF_SIZE, "%s%.02x ", (char *)data_buf, *(nvm_byte_ptr + i));
 
@@ -1011,13 +1030,13 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
 
     for(i=0;i<total_segment ;i++){
         if ((i+1) == total_segment) {
-             if ((rome_ver >= ROME_VER_1_1) && (rome_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+             if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
                /* If the Rome version is from 1.1 to 3.1
                 * 1. No CCE for the last command segment but all other segment
                 * 2. All the command segments get VSE including the last one
                 */
                 wait_cc_evt = !remain_size ? FALSE: TRUE;
-             } else if ((rome_ver == ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+             } else if ((chipset_ver >= ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
                 /* If the Rome version is 3.2
                  * 1. None of the command segments receive CCE
                  * 2. No command segments receive VSE except the last one
@@ -1038,13 +1057,13 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
         patch_dnld_pending = FALSE;
     }
 
-    if ((rome_ver >= ROME_VER_1_1) && (rome_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+    if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
        /* If the Rome version is from 1.1 to 3.1
         * 1. No CCE for the last command segment but all other segment
         * 2. All the command segments get VSE including the last one
         */
         wait_cc_evt = remain_size ? FALSE: TRUE;
-    } else if ((rome_ver == ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+    } else if ((chipset_ver >= ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
         /* If the Rome version is 3.2
          * 1. None of the command segments receive CCE
          * 2. No command segments receive VSE except the last one
@@ -1071,8 +1090,10 @@ int rome_download_tlv_file(int fd)
 
     /* Rampatch TLV file Downloading */
     pdata_buffer = NULL;
-    if((tlv_size = rome_get_tlv_file(rampatch_file_path)) < 0)
-        goto error;
+    if((tlv_size = rome_get_tlv_file(rampatch_file_path)) <= 0) {
+        ALOGI("%s: rampatch file is not available", __FUNCTION__);
+        goto nvm_download;
+    }
 
     if((err =rome_tlv_dnld_req(fd, tlv_size)) <0 )
         goto error;
@@ -1081,8 +1102,16 @@ int rome_download_tlv_file(int fd)
         free (pdata_buffer);
         pdata_buffer = NULL;
     }
-    /* NVM TLV file Downloading */
-    if((tlv_size = rome_get_tlv_file(nvm_file_path)) < 0)
+
+nvm_download:
+    if(!nvm_file_path) {
+        ALOGI("%s: nvm file is not available", __FUNCTION__);
+        err = 0; // in case of nvm/rampatch is not available
+        goto error;
+    }
+
+   /* NVM TLV file Downloading */
+    if((tlv_size = rome_get_tlv_file(nvm_file_path)) <= 0)
         goto error;
 
     if((err =rome_tlv_dnld_req(fd, tlv_size)) <0 )
@@ -1816,9 +1845,9 @@ int rome_soc_init(int fd, char *bdaddr)
         goto error;
     }
 
-    ALOGI("%s: Rome Version (0x%08x)", __FUNCTION__, rome_ver);
+    ALOGI("%s: Chipset Version (0x%08x)", __FUNCTION__, chipset_ver);
 
-    switch (rome_ver){
+    switch (chipset_ver){
         case ROME_VER_1_0:
             {
                 /* Set and Download the RAMPATCH */
@@ -1888,7 +1917,10 @@ int rome_soc_init(int fd, char *bdaddr)
             nvm_file_path = ROME_NVM_TLV_3_0_2_PATH;
             fw_su_info = ROME_3_2_FW_SU;
             fw_su_offset =  ROME_3_2_FW_SW_OFFSET;
-
+        case CHEROKEE_VER_0_0:
+        case CHEROKEE_VER_1_0:
+            rampatch_file_path = CHEROKEE_RAMPATCH_TLV_1_0_PATH;
+            nvm_file_path = CHEROKEE_NVM_TLV_1_0_PATH;
 download:
             /* Change baud rate 115.2 kbps to 3Mbps*/
             err = rome_set_baudrate_req(fd);

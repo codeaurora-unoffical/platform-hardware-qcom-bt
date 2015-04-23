@@ -18,6 +18,7 @@
 #ifndef HW_ROME_H
 #define HW_ROME_H
 
+
 /******************************************************************************
 **  Constants & Macros
 ******************************************************************************/
@@ -165,6 +166,8 @@
 //#define ROME_NVM_TLV_3_0_0_PATH         "/system/etc/firmware/nvm_tlv_3.0.bin"
 //#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/system/etc/firmware/rampatch_tlv_3.2.tlv"
 //#define ROME_NVM_TLV_3_0_2_PATH         "/system/etc/firmware/nvm_tlv_3.2.bin"
+#define CHEROKEE_RAMPATCH_TLV_1_0_PATH    "/bt_firmware/image/crbtfw10.tlv"
+#define CHEROKEE_NVM_TLV_1_0_PATH         "/bt_firmware/image/crbtnv10.bin"
 
 #define ROME_3_1_FW_SU  "bprm.cnss.3.1"
 #define ROME_3_2_FW_SU  "btfwp.cnss.3.2"
@@ -260,27 +263,43 @@ enum{
 };
 
 enum{
-    ROME_PATCH_VER_0100 = 0x0100,
-    ROME_PATCH_VER_0101 = 0x0101,
-    ROME_PATCH_VER_0200 = 0x0200,
-    ROME_PATCH_VER_0300 = 0x0300,
-    ROME_PATCH_VER_0302 = 0x0302
+    PROD_ID_ROME = 0x08,
+    PROD_ID_CHEROKEE = 0x0A
+};
+
+enum{
+    ROME_BUILD_VER_0100 = 0x0100,
+    ROME_BUILD_VER_0101 = 0x0101,
+    ROME_BUILD_VER_0200 = 0x0200,
+    ROME_BUILD_VER_0300 = 0x0300,
+    ROME_BUILD_VER_0302 = 0x0302,
+
  };
 
 enum{
-    ROME_SOC_ID_00 = 0x00000000,
-    ROME_SOC_ID_11 = 0x00000011,
-    ROME_SOC_ID_22 = 0x00000022,
-    ROME_SOC_ID_44 = 0x00000044
+    SOC_ID_00 = 0x00000000,
+    SOC_ID_11 = 0x00000011,
+    SOC_ID_22 = 0x00000022,
+    SOC_ID_44 = 0x00000044
 };
 
 enum{
     ROME_VER_UNKNOWN = 0,
-    ROME_VER_1_0 = ((ROME_PATCH_VER_0100 << 16 ) | ROME_SOC_ID_00 ),
-    ROME_VER_1_1 = ((ROME_PATCH_VER_0101 << 16 ) | ROME_SOC_ID_00 ),
-    ROME_VER_1_3 = ((ROME_PATCH_VER_0200 << 16 ) | ROME_SOC_ID_00 ),
-    ROME_VER_2_1 = ((ROME_PATCH_VER_0200 << 16 ) | ROME_SOC_ID_11 ),
-    ROME_VER_3_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_22 ),
-    ROME_VER_3_2 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_44 )
+    ROME_VER_1_0 = ((PROD_ID_ROME << 24) | (ROME_BUILD_VER_0100 << 8 ) | SOC_ID_00 ),
+    ROME_VER_1_1 = ((PROD_ID_ROME << 24) | (ROME_BUILD_VER_0101 << 8 ) | SOC_ID_00 ),
+    ROME_VER_1_3 = ((PROD_ID_ROME << 24) | (ROME_BUILD_VER_0200 << 8 ) | SOC_ID_00 ),
+    ROME_VER_2_1 = ((PROD_ID_ROME << 24) | (ROME_BUILD_VER_0200 << 8 ) | SOC_ID_11 ),
+    ROME_VER_3_0 = ((PROD_ID_ROME << 24) | (ROME_BUILD_VER_0300 << 8 ) | SOC_ID_22 ),
+    ROME_VER_3_2 = ((PROD_ID_ROME << 24) | (ROME_BUILD_VER_0302 << 8 ) | SOC_ID_44 ),
+};
+
+enum{
+    CHEROKEE_BUILD_VER_0000   = 0x1100,
+    CHEROKEE_BUILD_VER_0100   = 0x0100
+};
+
+enum{
+    CHEROKEE_VER_0_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0000 << 8 )| SOC_ID_00 ),
+    CHEROKEE_VER_1_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0100 << 8 )| SOC_ID_00 )
 };
 #endif /* HW_ROME_H */
