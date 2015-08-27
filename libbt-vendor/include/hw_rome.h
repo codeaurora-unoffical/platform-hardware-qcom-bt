@@ -169,6 +169,9 @@
 #define CHEROKEE_RAMPATCH_TLV_1_0_PATH    "/bt_firmware/image/crbtfw10.tlv"
 #define CHEROKEE_NVM_TLV_1_0_PATH         "/bt_firmware/image/crbtnv10.bin"
 
+#define CHEROKEE_RAMPATCH_TLV_1_0_PATH_ALT    "/system/etc/firmware/crbtfw10.tlv"
+#define CHEROKEE_NVM_TLV_1_0_PATH_ALT         "/system/etc/firmware/crbtnv10.bin"
+
 #define ROME_3_1_FW_SU  "bprm.cnss.3.1"
 #define ROME_3_2_FW_SU  "btfwp.cnss.3.2"
 

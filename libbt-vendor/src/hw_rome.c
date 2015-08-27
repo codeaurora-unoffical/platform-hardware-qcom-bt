@@ -1932,8 +1932,15 @@ download:
             /* Donwload TLV files (rampatch, NVM) */
             err = rome_download_tlv_file(fd);
             if (err < 0) {
-                ALOGE("%s: Download TLV file failed!", __FUNCTION__);
-                goto error;
+
+                ALOGE("%s: Let's try different path",__FUNCTION__);
+                rampatch_file_path = CHEROKEE_RAMPATCH_TLV_1_0_PATH_ALT;
+                nvm_file_path = CHEROKEE_NVM_TLV_1_0_PATH_ALT;
+                err = rome_download_tlv_file(fd);
+                if (err < 0){
+                    ALOGE("%s: Download TLV file failed!", __FUNCTION__);
+                    goto error;
+                }
             }
             ALOGI("%s: Download TLV file successfully ", __FUNCTION__);
 
