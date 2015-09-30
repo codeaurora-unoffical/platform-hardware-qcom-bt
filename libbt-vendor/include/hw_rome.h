@@ -168,6 +168,12 @@
 //#define ROME_NVM_TLV_3_0_2_PATH         "/system/etc/firmware/nvm_tlv_3.2.bin"
 #define CHEROKEE_RAMPATCH_TLV_1_0_PATH    "/bt_firmware/image/crbtfw10.tlv"
 #define CHEROKEE_NVM_TLV_1_0_PATH         "/bt_firmware/image/crbtnv10.bin"
+#define CHEROKEE_RAMPATCH_TLV_2_0_PATH    "/bt_firmware/image/crbtfw20.tlv"
+#define CHEROKEE_NVM_TLV_2_0_PATH         "/bt_firmware/image/crbtnv20.bin"
+#define CHEROKEE_RAMPATCH_TLV_2_1_PATH    "/bt_firmware/image/crbtfw21.tlv"
+#define CHEROKEE_NVM_TLV_2_1_PATH         "/bt_firmware/image/crbtnv21.bin"
+#define CHEROKEE_RAMPATCH_TLV_3_0_PATH    "/bt_firmware/image/crbtfw30.tlv"
+#define CHEROKEE_NVM_TLV_3_0_PATH         "/bt_firmware/image/crbtnv30.bin"
 
 #define CHEROKEE_RAMPATCH_TLV_1_0_PATH_ALT    "/system/etc/firmware/crbtfw10.tlv"
 #define CHEROKEE_NVM_TLV_1_0_PATH_ALT         "/system/etc/firmware/crbtnv10.bin"
@@ -298,11 +304,27 @@ enum{
 
 enum{
     CHEROKEE_BUILD_VER_0000   = 0x1100,
-    CHEROKEE_BUILD_VER_0100   = 0x0100
+    CHEROKEE_BUILD_VER_0100   = 0x0100,
+    CHEROKEE_BUILD_VER_0200   = 0x0200,
+    CHEROKEE_BUILD_VER_0201   = 0x0201,
+    CHEROKEE_BUILD_VER_0300   = 0x0300
 };
 
 enum{
-    CHEROKEE_VER_0_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0000 << 8 )| SOC_ID_00 ),
-    CHEROKEE_VER_1_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0100 << 8 )| SOC_ID_00 )
+    QCA_CHEROKEE_SOC_ID_0100  = 0x40010100,
+    QCA_CHEROKEE_SOC_ID_0200  = 0x40010200,
+    QCA_CHEROKEE_SOC_ID_0210  = 0x40010210,
+    QCA_CHEROKEE_SOC_ID_0300  = 0x40010300,
+};
+
+enum{
+    /* FPGA */
+    CHEROKEE_VER_0_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0000 ) ),
+    CHEROKEE_VER_0_1 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0100) | QCA_CHEROKEE_SOC_ID_0100 ),
+    /* Silicon*/
+    CHEROKEE_VER_1_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0100) ),
+    CHEROKEE_VER_2_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0200) |(QCA_CHEROKEE_SOC_ID_0200)),
+    CHEROKEE_VER_2_1 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0201) |(QCA_CHEROKEE_SOC_ID_0210)),
+    CHEROKEE_VER_3_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0300) |(QCA_CHEROKEE_SOC_ID_0300))
 };
 #endif /* HW_ROME_H */

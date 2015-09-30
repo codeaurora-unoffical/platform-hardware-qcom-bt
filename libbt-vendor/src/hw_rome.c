@@ -188,11 +188,13 @@ int get_vs_hci_event(unsigned char *rsp)
                 }else {
                     ALOGI("Failed to dump SOC version info. Errno:%d", errno);
                 }
-
                 /* Rome Chipset Version can be decided by Patch version and SOC version,
                 Upper 2 bytes will be used for Patch version and Lower 2 bytes will be
                 used for SOC as combination for BT host driver */
-                chipset_ver = (productid << 24) | (buildversion << 8) | (soc_id & 0x0000ffff);
+                if (productid == PROD_ID_ROME)
+                    chipset_ver = (productid << 24) | (buildversion << 8) |(soc_id & 0x0000ffff);
+                else
+                    chipset_ver = (productid << 24) | (buildversion ) |(soc_id );
                 break;
             case EDL_TVL_DNLD_RES_EVT:
             case EDL_CMD_EXE_STATUS_EVT:
@@ -1917,10 +1919,24 @@ int rome_soc_init(int fd, char *bdaddr)
             nvm_file_path = ROME_NVM_TLV_3_0_2_PATH;
             fw_su_info = ROME_3_2_FW_SU;
             fw_su_offset =  ROME_3_2_FW_SW_OFFSET;
+            goto download;
         case CHEROKEE_VER_0_0:
+        case CHEROKEE_VER_0_1:
         case CHEROKEE_VER_1_0:
             rampatch_file_path = CHEROKEE_RAMPATCH_TLV_1_0_PATH;
             nvm_file_path = CHEROKEE_NVM_TLV_1_0_PATH;
+            goto download;
+        case CHEROKEE_VER_2_0:
+            rampatch_file_path = CHEROKEE_RAMPATCH_TLV_2_0_PATH;
+            nvm_file_path = CHEROKEE_NVM_TLV_2_0_PATH;
+            goto download;
+        case CHEROKEE_VER_2_1:
+            rampatch_file_path = CHEROKEE_RAMPATCH_TLV_2_1_PATH;
+            nvm_file_path = CHEROKEE_NVM_TLV_2_1_PATH;
+            goto download;
+        case CHEROKEE_VER_3_0:
+            rampatch_file_path = CHEROKEE_RAMPATCH_TLV_3_0_PATH;
+            nvm_file_path = CHEROKEE_NVM_TLV_3_0_PATH;
 download:
             /* Change baud rate 115.2 kbps to 3Mbps*/
             err = rome_set_baudrate_req(fd);
