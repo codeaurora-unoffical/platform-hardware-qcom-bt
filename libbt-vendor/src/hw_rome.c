@@ -69,7 +69,7 @@ FILE *file;
 unsigned char *phdr_buffer;
 unsigned char *pdata_buffer = NULL;
 patch_info rampatch_patch_info;
-int chipset_ver = ROME_VER_UNKNOWN;
+int chipset_ver = 0;
 unsigned char gTlv_type;
 unsigned char gTlv_dwndCfg;
 static unsigned int wipower_flag = 0;
@@ -1824,6 +1824,18 @@ static int disable_internal_ldo(int fd)
     return ret;
 }
 
+void cherokee_shutdown_vs_cmd(int fd)
+{
+    int ret = 0;
+    unsigned char cmd[4] = {0x01, 0x41, 0xFC, 0x00};
+
+    ALOGI(" %s ", __FUNCTION__);
+    ret = write(fd, cmd, 4);
+    if (ret != 4) {
+        ALOGE("%s: Send failed with ret value: %d", __FUNCTION__, ret);
+    }
+}
+
 int rome_soc_init(int fd, char *bdaddr)
 {
     int err = -1, size = 0;
@@ -1980,9 +1992,8 @@ download:
             ALOGI("HCI Reset is done\n");
 
             break;
-        case ROME_VER_UNKNOWN:
         default:
-            ALOGI("%s: Detected unknown ROME version", __FUNCTION__);
+            ALOGI("%s: Detected unknown SoC version: 0x%08x", __FUNCTION__, chipset_ver);
             err = -1;
             break;
     }
