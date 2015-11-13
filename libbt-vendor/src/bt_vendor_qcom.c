@@ -52,9 +52,12 @@
 #define BT_VND_FILTER_START "wc_transport.start_hci"
 
 #define CMD_TIMEOUT  0x22
-void wait_for_patch_download();
+
+static void wait_for_patch_download(bool is_ant_req);
 static bool is_debug_force_special_bytes(void);
 int connect_to_local_socket(char* name);
+
+
 /******************************************************************************
 **  Externs
 ******************************************************************************/
@@ -246,8 +249,8 @@ bool can_perform_action(char action) {
         ALOGV("%s: on : value is: %d", __func__, value);
         if(value == 1)
         {
-            if ((is_soc_initialized() == true)
-               || is_download_progress() || get_bt_soc_type() == BT_SOC_CHEROKEE)
+          property_get("wc_transport.patch_dnld_inprog", inProgress, "null");
+          if((is_soc_initialized() == true) || (strcmp(inProgress,"null") != 0))
           {
             value++;
             ALOGV("%s: on : value is incremented to : %d", __func__, value);
@@ -257,15 +260,19 @@ bool can_perform_action(char action) {
         {
              value++;
         }
+
         if (value == 1)
            can_perform = true;
-        else if (value > 3) return false;
-    } else  {
+        else if (value > 3) 
+           return false;
+    }
+    else {
         ALOGV("%s: off : value is: %d", __func__, value);
         value--;
         if (value == 0)
            can_perform = true;
-        else if (value < 0) return false;
+        else if (value < 0)
+           return false;
     }
 
     snprintf(ref_count, 3, "%d", value);
@@ -854,12 +861,14 @@ userial_open:
                         break;
                     case BT_SOC_ROME:
                         {
-                            wait_for_patch_download();
+                            wait_for_patch_download(is_ant_req);
                             property_get("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
                             if (!is_soc_initialized()) {
-                                if (property_set("wc_transport.patch_dnld_inprog", "1") < 0) {
-                                    ALOGE("%s: Failed to set property", __FUNCTION__);
+                                char* dlnd_inprog = is_ant_req ? "ant" : "bt";
+                                if (property_set("wc_transport.patch_dnld_inprog", dlnd_inprog) < 0) {
+                                    ALOGE("%s: Failed to set dnld_inprog %s", __FUNCTION__, dlnd_inprog);
                                 }
+
                                 fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
                                 if (fd < 0) {
                                     ALOGE("userial_vendor_open returns err");
@@ -929,7 +938,7 @@ userial_open:
                                     }
                                 }
                             }
-                            if (property_set("wc_transport.patch_dnld_inprog", "0") < 0) {
+                            if (property_set("wc_transport.patch_dnld_inprog", "null") < 0) {
                                 ALOGE("%s: Failed to set property", __FUNCTION__);
                             }
 
@@ -1228,7 +1237,7 @@ static void ssr_cleanup(int reason) {
     int ret;
     unsigned char trig_ssr = 0xEE;
     ALOGI("ssr_cleanup");
-    if (property_set("wc_transport.patch_dnld_inprog", "0") < 0) {
+    if (property_set("wc_transport.patch_dnld_inprog", "null") < 0) {
         ALOGE("%s: Failed to set property", __FUNCTION__);
     }
 
@@ -1288,12 +1297,18 @@ static void cleanup( void )
 /* Check for one of the cients ANT/BT patch download is already in
 ** progress if yes wait till complete
 */
-void wait_for_patch_download() {
+void wait_for_patch_download(bool is_ant_req) {
     ALOGV("%s:", __FUNCTION__);
     char inProgress[PROPERTY_VALUE_MAX] = {'\0'};
     while (1) {
-        property_get("wc_transport.patch_dnld_inprog", inProgress, "0");
-        if(strcmp(inProgress,"1") == 0) {
+        property_get("wc_transport.patch_dnld_inprog", inProgress, "null");
+
+        if(is_ant_req && !strcmp(inProgress,"bt") ) {
+           //ANT request, wait for BT to finish
+           usleep(50000);
+        }
+        else if(!is_ant_req && !strcmp(inProgress,"ant") ) {
+           //BT request, wait for ANT to finish
            usleep(50000);
         }
         else {
