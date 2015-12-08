@@ -76,6 +76,8 @@ uint8_t userial_to_tcio_baud(uint8_t cfg_baud, uint32_t *baud)
         *baud = B4000000;
     else if (cfg_baud == USERIAL_BAUD_3M)
         *baud = B3000000;
+    else if (cfg_baud == USERIAL_BAUD_3_2M)
+        *baud = B3200000;
     else if (cfg_baud == USERIAL_BAUD_2M)
         *baud = B2000000;
     else if (cfg_baud == USERIAL_BAUD_1M)
@@ -156,6 +158,9 @@ int userial_tcio_baud_to_int(uint32_t baud)
             break;
         case B3000000:
             baud_rate = 3000000;
+            break;
+        case B3200000:
+            baud_rate = 3200000;
             break;
         case B4000000:
             baud_rate = 4000000;
@@ -288,8 +293,11 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
 
     /* Set UART Control Modes */
     vnd_userial.termios.c_cflag |= CLOCAL;
-    vnd_userial.termios.c_cflag |= (CRTSCTS | stop_bits);
-
+    vnd_userial.termios.c_cflag |= stop_bits;
+    if (p_cfg->fmt & USERIAL_CTSRTS) {
+        ALOGI("userial vendor open: HW flow control enabled");
+        vnd_userial.termios.c_cflag |= (CRTSCTS);
+    }
     tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
 
     /* set input/output baudrate */

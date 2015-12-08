@@ -87,8 +87,14 @@ void lpm_set_ar3k(uint8_t pio, uint8_t action, uint8_t polarity);
 
 static const tUSERIAL_CFG userial_init_cfg =
 {
+    (USERIAL_DATABITS_8 | USERIAL_PARITY_NONE | USERIAL_STOPBITS_1 |USERIAL_CTSRTS),
+    USERIAL_BAUD_115200 /* bit = 8.6 us */
+};
+
+static const tUSERIAL_CFG bt_reset_cfg =
+{
     (USERIAL_DATABITS_8 | USERIAL_PARITY_NONE | USERIAL_STOPBITS_1),
-    USERIAL_BAUD_115200
+    USERIAL_BAUD_115200 /* bit = 8.6 us*/
 };
 
 #if (HW_NEED_END_WITH_HCI_RESET == TRUE)
@@ -622,6 +628,20 @@ bool is_soc_initialized() {
     return init;
 }
 
+int bt_reset_val ()
+{
+   char value[PROPERTY_VALUE_MAX] = {'\0'};
+   property_get("persist.service.bdroid.reset", value, "254");
+   return atoi(value);
+}
+
+int bt_operation ()
+{
+   char value[PROPERTY_VALUE_MAX] = {'\0'};
+   property_get("persist.service.bdroid.on", value, "1");
+   return atoi(value);
+}
+
 
 /** Requested operations */
 static int op(bt_vendor_opcode_t opcode, void *param)
@@ -768,13 +788,15 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                         break;
                     case BT_SOC_ROME:
                         {
+                            int len;
+                            char reset_val = bt_reset_val();
                             wait_for_patch_download();
                             property_get("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
                             if (!is_soc_initialized()) {
                                 if (property_set("wc_transport.patch_dnld_inprog", "1") < 0) {
                                     ALOGE("%s: Failed to set property", __FUNCTION__);
                                 }
-                                fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
+                                fd = userial_vendor_open((tUSERIAL_CFG *) &bt_reset_cfg);
                                 if (fd < 0) {
                                     ALOGE("userial_vendor_open returns err");
                                     retval = -1;
@@ -782,6 +804,22 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                     /* Clock on */
                                     userial_clock_operation(fd, USERIAL_OP_CLK_ON);
                                     ALOGD("userial clock on");
+
+                                    /* UART TxD control as BT Reset*/
+                                    ALOGI("reset_val: 0x%x", reset_val);
+                                    /* 0xFE = '0' single bit = 8.6 us + start bit 8.6us ~= 17.2 us */
+                                    len = write(fd, &reset_val, 1);
+                                    if (len != 1 ||!bt_operation()) {
+                                        ALOGE("%s: Send failed with ret value: %d", __FUNCTION__, len);
+                                        retval = -1;
+                                        break;
+                                    }
+                                    fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
+                                    if (fd < 0) {
+                                        ALOGE("userial_vendor_open returns err");
+                                        retval = -1;
+                                        break;
+                                    }
                                     if(strcmp(emb_wp_mode, "true") == 0) {
                                         property_get("ro.bluetooth.wipower", wipower_status, false);
                                         if(strcmp(wipower_status, "true") == 0) {
