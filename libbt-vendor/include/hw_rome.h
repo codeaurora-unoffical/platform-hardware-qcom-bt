@@ -248,6 +248,7 @@ typedef struct {
 
 
 enum{
+    /* ROME Supported Baud rate */
     BAUDRATE_115200     = 0x00,
     BAUDRATE_57600       = 0x01,
     BAUDRATE_38400       = 0x02,
@@ -267,6 +268,14 @@ enum{
     BAUDRATE_1600000   = 0x10,
     BAUDRATE_3200000   = 0x11,
     BAUDRATE_3500000   = 0x12,
+
+    /* MSM Supported Baud rate */
+    BAUDRATE_300              = 0x13,
+    BAUDRATE_600              = 0x14,
+    BAUDRATE_1200           = 0x15,
+    BAUDRATE_2400           = 0x16,
+    BAUDRATE_1500000   = 0x17,
+
     BAUDRATE_AUTO        = 0xFE,
     BAUDRATE_Reserved  = 0xFF
 };

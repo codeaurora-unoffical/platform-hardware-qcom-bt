@@ -94,10 +94,14 @@ uint8_t userial_to_tcio_baud(uint8_t cfg_baud, uint32_t *baud)
         *baud = B19200;
     else if (cfg_baud == USERIAL_BAUD_9600)
         *baud = B9600;
+    else if (cfg_baud == USERIAL_BAUD_2400)
+        *baud = B2400;
     else if (cfg_baud == USERIAL_BAUD_1200)
         *baud = B1200;
     else if (cfg_baud == USERIAL_BAUD_600)
         *baud = B600;
+    else if (cfg_baud == USERIAL_BAUD_300)
+        *baud = B300;
     else
     {
         ALOGE( "userial vendor open: unsupported baud idx %i", cfg_baud);
@@ -123,11 +127,17 @@ int userial_tcio_baud_to_int(uint32_t baud)
 
     switch (baud)
     {
+        case B300:
+            baud_rate = 300;
+            break;
         case B600:
             baud_rate = 600;
             break;
         case B1200:
             baud_rate = 1200;
+            break;
+        case B2400:
+            baud_rate = 2400;
             break;
         case B9600:
             baud_rate = 9600;
@@ -292,11 +302,12 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
     cfmakeraw(&vnd_userial.termios);
 
     /* Set UART Control Modes */
-    vnd_userial.termios.c_cflag |= CLOCAL;
-    vnd_userial.termios.c_cflag |= stop_bits;
+    vnd_userial.termios.c_cflag &= ~(CRTSCTS); /* Clear CTS/RTS flow control bit */
+    vnd_userial.termios.c_cflag |= stop_bits; /* Stop Bit */
+    vnd_userial.termios.c_cflag |= CLOCAL; /* Ignore modem control lines */
     if (p_cfg->fmt & USERIAL_CTSRTS) {
         ALOGI("userial vendor open: HW flow control enabled");
-        vnd_userial.termios.c_cflag |= (CRTSCTS);
+        vnd_userial.termios.c_cflag |= (CRTSCTS); /* Enable CTS/RTS flow control */
     }
     tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
 
@@ -310,6 +321,8 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
 #if (BT_WAKE_VIA_USERIAL_IOCTL==TRUE)
     userial_ioctl_init_bt_wake(vnd_userial.fd);
 #endif
+
+    userial_vendor_get_baud();
 
     ALOGI("device fd = %d open", vnd_userial.fd);
 

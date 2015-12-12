@@ -91,11 +91,18 @@ static const tUSERIAL_CFG userial_init_cfg =
     USERIAL_BAUD_115200 /* bit = 8.6 us */
 };
 
-static const tUSERIAL_CFG bt_reset_cfg =
+static tUSERIAL_CFG bt_reset_cfg =
 {
     (USERIAL_DATABITS_8 | USERIAL_PARITY_NONE | USERIAL_STOPBITS_1),
     USERIAL_BAUD_115200 /* bit = 8.6 us*/
 };
+
+static tUSERIAL_CFG bt_shutdown_cfg =
+{
+    (USERIAL_DATABITS_8 | USERIAL_PARITY_NONE | USERIAL_STOPBITS_1),
+    USERIAL_BAUD_300 /* bit = 3.3 ms */
+};
+
 
 #if (HW_NEED_END_WITH_HCI_RESET == TRUE)
 void hw_epilog_process(void);
@@ -628,20 +635,20 @@ bool is_soc_initialized() {
     return init;
 }
 
-int bt_reset_val ()
+int bt_shutdown_val ()
 {
    char value[PROPERTY_VALUE_MAX] = {'\0'};
-   property_get("persist.service.bdroid.reset", value, "254");
+   property_get("persist.service.bdroid.down", value, "0"); /* 0x00 = 8 bit 0 + start bit */
    return atoi(value);
 }
 
-int bt_operation ()
+int bt_baud_val ()
 {
+    /* Default Baud rate: 300 bps refer to above table */
    char value[PROPERTY_VALUE_MAX] = {'\0'};
-   property_get("persist.service.bdroid.on", value, "1");
+   property_get("persist.service.bdroid.baud", value, "19");
    return atoi(value);
 }
-
 
 /** Requested operations */
 static int op(bt_vendor_opcode_t opcode, void *param)
@@ -789,7 +796,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     case BT_SOC_ROME:
                         {
                             int len;
-                            char reset_val = bt_reset_val();
+                            char reset_val = 0xFF;
                             wait_for_patch_download();
                             property_get("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
                             if (!is_soc_initialized()) {
@@ -805,21 +812,28 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                     userial_clock_operation(fd, USERIAL_OP_CLK_ON);
                                     ALOGD("userial clock on");
 
+                                    /* Give some delay before clock and uart driver is ramping up and ready */
+                                    usleep(200); /* 200 us delay */
+
                                     /* UART TxD control as BT Reset*/
-                                    ALOGI("reset_val: 0x%x", reset_val);
-                                    /* 0xFE = '0' single bit = 8.6 us + start bit 8.6us ~= 17.2 us */
+                                    /* 0xFF = '0' start bit = 8.6 us */
                                     len = write(fd, &reset_val, 1);
-                                    if (len != 1 ||!bt_operation()) {
+                                    if (len != 1 ) {
                                         ALOGE("%s: Send failed with ret value: %d", __FUNCTION__, len);
                                         retval = -1;
                                         break;
                                     }
+                                    /* Close uart port for the reset handler */
+                                    userial_vendor_close();
                                     fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
                                     if (fd < 0) {
                                         ALOGE("userial_vendor_open returns err");
                                         retval = -1;
                                         break;
                                     }
+
+                                    /* For Cherokee, it need to wait for 100ms */
+                                    usleep(100*1000);
                                     if(strcmp(emb_wp_mode, "true") == 0) {
                                         property_get("ro.bluetooth.wipower", wipower_status, false);
                                         if(strcmp(wipower_status, "true") == 0) {
@@ -973,6 +987,11 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                         break;
                     case BT_SOC_ROME:
                     case BT_SOC_AR3K:
+                    {
+                        int fd, len;
+                        char shutdown_val = bt_shutdown_val();
+                        bt_shutdown_cfg.baud = (uint8_t ) bt_baud_val();
+
                         property_set("wc_transport.clean_up","1");
                         /* Cherokee 1.0 or FPGA should send VSC to shutdown chipset*/
                         if((chipset_ver == CHEROKEE_VER_1_0) || (chipset_ver == CHEROKEE_VER_0_0)
@@ -980,7 +999,35 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             cherokee_shutdown_vs_cmd(vnd_userial.fd);
                         }
                         userial_vendor_close();
+
+                        /* For Cherokee, it need to have hammer reset to shut down the chipset */
+                        if(chipset_ver <  CHEROKEE_VER_1_0 ){
+                            ALOGE("It is not Cherokee chipset!!");
+                            break;
+                        }
+                        /* Baudrate = 300 bps */
+                        fd = userial_vendor_open((tUSERIAL_CFG *) &bt_shutdown_cfg);
+                        if (fd < 0) {
+                            ALOGE("userial_vendor_open returns err");
+                            retval = -1;
+                            break;
+                        }
+
+                        /* Give some delay before clock and uart driver is ramping up and ready */
+                        usleep(200); /* 200 us delay */
+
+                        /* UART TxD control as BT Reset*/
+                        ALOGI("shutdown_val: 0x%x", shutdown_val);
+                        /* 0xF0 = 4 '0' single bit = 0.416 ms * 4 + start bit 0.416ms ~= 2.08 ms */
+                        len = write(fd, &shutdown_val, 1);
+                        if (len != 1) {
+                            ALOGE("%s: Send failed with ret value: %d", __FUNCTION__, len);
+                            retval = -1;
+                            break;
+                        }
+                        userial_vendor_close();
                         break;
+                    }
                     default:
                         ALOGE("Unknown btSocType: 0x%x", btSocType);
                         break;
