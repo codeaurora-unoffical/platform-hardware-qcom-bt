@@ -41,7 +41,7 @@
 #include "hw_rome.h"
 #include "bt_vendor_lib.h"
 #define WAIT_TIMEOUT 200000
-#define BT_VND_OP_GET_LINESPEED 12
+#define BT_VND_OP_GET_LINESPEED 13
 
 #ifdef PANIC_ON_SOC_CRASH
 #define BT_VND_FILTER_START "wc_transport.start_root"
@@ -266,7 +266,7 @@ bool can_perform_action(char action) {
         }
         if (value == 1)
            can_perform = true;
-        else if (value > 2) return false;
+        else if (value > 3) return false;
     } else  {
         ALOGV("%s: off : value is: %d", __func__, value);
         value--;
@@ -532,8 +532,11 @@ static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
     {
         case BT_SOC_ROME:
         case BT_SOC_AR3K:
-            ALOGI("bt-vendor : Initializing UART transport layer");
-            userial_vendor_init();
+            ALOGI("bt-vendor : check soc initialized ");
+            if (!is_soc_initialized()) {
+                ALOGI("bt-vendor : Initializing UART transport layer");
+                userial_vendor_init();
+            }
             break;
         case BT_SOC_DEFAULT:
             break;
@@ -744,10 +747,14 @@ static int op(bt_vendor_opcode_t opcode, void *param)
         case BT_VND_OP_ANT_USERIAL_OPEN:
                 ALOGI("bt-vendor : BT_VND_OP_ANT_USERIAL_OPEN");
                 is_ant_req = true;
-                //fall through
+                goto userial_open;
 #endif
-
 #endif
+        case BT_VND_OP_FM_USERIAL_OPEN:
+                ALOGI("bt-vendor : BT_VND_OP_FM_USERIAL_OPEN");
+                is_fm_req = true;
+                goto userial_open;
+userial_open:
         case BT_VND_OP_USERIAL_OPEN:
             {
                 int (*fd_array)[] = (int (*)[]) param;
@@ -920,11 +927,11 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                     vnd_userial.fd = fd = connect_to_local_socket("bt_sock");
                                 }
                                  if (fd != -1) {
-                                     ALOGV("%s: received the socket fd: %d is_ant_req: %d\n",
-                                                                 __func__, fd, is_ant_req);
+                                     ALOGI("%s: received the socket fd: %d is_ant_req: %d is_fm_req: %d\n",
+                                                                 __func__, fd, is_ant_req,is_fm_req);
 
-                                    if((strcmp(emb_wp_mode, "true") == 0) && !is_ant_req) {
-                                        if (chipset_ver >= ROME_VER_3_0) {
+                                    if((strcmp(emb_wp_mode, "true") == 0) && !is_ant_req && !is_fm_req) {
+                                       if (chipset_ver >= ROME_VER_3_0) {
                                             /*  get rome supported feature request */
                                             ALOGE("%s: %x08 %0x", __FUNCTION__,chipset_ver, ROME_VER_3_0);
                                             rome_get_addon_feature_list(fd);
@@ -932,7 +939,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                     }
                                      if (!skip_init) {
                                          /*Skip if already sent*/
-                                         enable_controller_log(fd, is_ant_req);
+                                         enable_controller_log(fd, (is_ant_req || is_fm_req) );
                                          skip_init = true;
                                      }
                                     for (idx=0; idx < CH_MAX; idx++)
@@ -977,6 +984,17 @@ static int op(bt_vendor_opcode_t opcode, void *param)
             break;
 #endif
 #endif
+        case BT_VND_OP_FM_USERIAL_CLOSE:
+            {
+                ALOGI("bt-vendor : BT_VND_OP_FM_USERIAL_CLOSE");
+                property_set("wc_transport.clean_up","1");
+                if (fm_fd != -1) {
+                    ALOGE("closing fm_fd");
+                    close(fm_fd);
+                    fm_fd = -1;
+                }
+            }
+           // break;
         case BT_VND_OP_USERIAL_CLOSE:
             {
                 ALOGI("bt-vendor : BT_VND_OP_USERIAL_CLOSE btSocType: %d", btSocType);
@@ -1190,6 +1208,7 @@ static void ssr_cleanup(int reason) {
 #endif
         /*Close both ANT channel*/
         op(BT_VND_OP_USERIAL_CLOSE, NULL);
+		op(BT_VND_OP_FM_USERIAL_CLOSE, NULL);
         /*CTRL OFF twice to make sure hw
          * turns off*/
 #ifdef ENABLE_ANT
