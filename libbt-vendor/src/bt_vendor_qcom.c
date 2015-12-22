@@ -100,7 +100,7 @@ static tUSERIAL_CFG bt_reset_cfg =
 static tUSERIAL_CFG bt_shutdown_cfg =
 {
     (USERIAL_DATABITS_8 | USERIAL_PARITY_NONE | USERIAL_STOPBITS_1),
-    USERIAL_BAUD_300 /* bit = 3.3 ms */
+    USERIAL_BAUD_2400 /* bit = 0.417 ms */
 };
 
 
@@ -638,21 +638,6 @@ bool is_soc_initialized() {
     return init;
 }
 
-int bt_shutdown_val ()
-{
-   char value[PROPERTY_VALUE_MAX] = {'\0'};
-   property_get("persist.service.bdroid.down", value, "0"); /* 0x00 = 8 bit 0 + start bit */
-   return atoi(value);
-}
-
-int bt_baud_val ()
-{
-    /* Default Baud rate: 300 bps refer to above table */
-   char value[PROPERTY_VALUE_MAX] = {'\0'};
-   property_get("persist.service.bdroid.baud", value, "19");
-   return atoi(value);
-}
-
 /** Requested operations */
 static int op(bt_vendor_opcode_t opcode, void *param)
 {
@@ -1007,15 +992,9 @@ userial_open:
                     case BT_SOC_AR3K:
                     {
                         int fd, len;
-                        char shutdown_val = bt_shutdown_val();
-                        bt_shutdown_cfg.baud = (uint8_t ) bt_baud_val();
+                        char shutdown_val = 0xE0;
 
                         property_set("wc_transport.clean_up","1");
-                        /* Cherokee 1.0 or FPGA should send VSC to shutdown chipset*/
-                        if((chipset_ver == CHEROKEE_VER_1_0) || (chipset_ver == CHEROKEE_VER_0_0)
-                            || (chipset_ver ==CHEROKEE_VER_0_1)) {
-                            cherokee_shutdown_vs_cmd(vnd_userial.fd);
-                        }
                         userial_vendor_close();
 
                         /* For Cherokee, it need to have hammer reset to shut down the chipset */
@@ -1035,7 +1014,6 @@ userial_open:
                         usleep(200); /* 200 us delay */
 
                         /* UART TxD control as BT Reset*/
-                        ALOGI("shutdown_val: 0x%x", shutdown_val);
                         /* 0xF0 = 4 '0' single bit = 0.416 ms * 4 + start bit 0.416ms ~= 2.08 ms */
                         len = write(fd, &shutdown_val, 1);
                         if (len != 1) {

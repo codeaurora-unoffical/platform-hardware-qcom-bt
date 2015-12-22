@@ -112,7 +112,6 @@ uint8_t userial_to_tcio_baud(uint8_t cfg_baud, uint32_t *baud)
         *baud = B115200;
         return FALSE;
     }
-
     return TRUE;
 }
 
