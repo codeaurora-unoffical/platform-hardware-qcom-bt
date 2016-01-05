@@ -788,7 +788,7 @@ userial_open:
                     case BT_SOC_ROME:
                         {
                             int len;
-                            char reset_val = 0xFF;
+                            char reset_val = 0xFC;
                             wait_for_patch_download();
                             property_get("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
                             if (!is_soc_initialized()) {
