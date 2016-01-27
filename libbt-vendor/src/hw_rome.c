@@ -829,7 +829,7 @@ int rome_get_tlv_file(char *file_path)
 {
     FILE * pFile;
     long fileSize;
-    int readSize, err = 0, total_segment, remain_size, nvm_length, nvm_index, i;
+    int readSize, err = 0, total_segment, remain_size, nvm_length, nvm_tot_len, nvm_index, i;
     unsigned short nvm_tag_len;
     tlv_patch_info *ptlv_header;
     tlv_nvm_hdr *nvm_ptr;
@@ -891,47 +891,63 @@ int rome_get_tlv_file(char *file_path)
         ALOGI("Patch Entry Address\t\t : 0x%x\n", (ptlv_header->tlv.patch.patch_entry_addr));
         ALOGI("====================================================");
 
-    } else if(ptlv_header->tlv_type == TLV_TYPE_NVM) {
+    }else if( (ptlv_header->tlv_type >= TLV_TYPE_BT_NVM) &&
+            ((ptlv_header->tlv_type <= TLV_TYPE_BT_FM_NVM)) ){
         ALOGI("====================================================");
         ALOGI("TLV Type\t\t\t : 0x%x", ptlv_header->tlv_type);
-        ALOGI("Length\t\t\t : %d bytes",  nvm_length = (ptlv_header->tlv_length1) |
+        ALOGI("Length\t\t\t : %d bytes",  nvm_tot_len = nvm_length  = (ptlv_header->tlv_length1) |
                                                     (ptlv_header->tlv_length2 << 8) |
                                                     (ptlv_header->tlv_length3 << 16));
+        ALOGI("====================================================");
 
-        if(nvm_length <= 0)
+        if(nvm_tot_len <= 0)
             return readSize;
 
+        if(ptlv_header->tlv_type == TLV_TYPE_BT_FM_NVM) {
+             nvm_byte_ptr = ptlv_header;
+             nvm_byte_ptr +=4;
+             ptlv_header = nvm_byte_ptr;
+             nvm_tot_len -=4;
+             ALOGI("====================================================");
+             ALOGI("TLV Type\t\t\t : 0x%x", ptlv_header->tlv_type);
+             ALOGI("Length\t\t\t : %d bytes",  nvm_length = (ptlv_header->tlv_length1) |
+                                                         (ptlv_header->tlv_length2 << 8) |
+                                                         (ptlv_header->tlv_length3 << 16));
+             ALOGI("====================================================");
+        }
+
+multi_nvm:
        for(nvm_byte_ptr=(unsigned char *)(nvm_ptr = &(ptlv_header->tlv.nvm)), nvm_index=0;
              nvm_index < nvm_length ; nvm_ptr = (tlv_nvm_hdr *) nvm_byte_ptr)
        {
             ALOGI("TAG ID\t\t\t : %d", nvm_ptr->tag_id);
-            ALOGI("TAG Length\t\t\t : %d", nvm_tag_len = nvm_ptr->tag_len);
-            ALOGI("TAG Pointer\t\t\t : %d", nvm_ptr->tag_ptr);
-            ALOGI("TAG Extended Flag\t\t : %d", nvm_ptr->tag_ex_flag);
+            ALOGI("TAG Length\t\t : %d", nvm_tag_len = nvm_ptr->tag_len);
+            ALOGI("TAG Pointer\t\t : %d", nvm_ptr->tag_ptr);
+            ALOGI("TAG Extended Flag\t : %d", nvm_ptr->tag_ex_flag);
 
             /* Increase nvm_index to NVM data */
             nvm_index+=sizeof(tlv_nvm_hdr);
             nvm_byte_ptr+=sizeof(tlv_nvm_hdr);
-
-            /* Write BD Address */
-            if(nvm_ptr->tag_id == TAG_NUM_2){
-                memcpy(nvm_byte_ptr, vnd_local_bd_addr, 6);
-                ALOGI("BD Address: %.02x:%.02x:%.02x:%.02x:%.02x:%.02x",
-                    *nvm_byte_ptr, *(nvm_byte_ptr+1), *(nvm_byte_ptr+2),
-                    *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
-            }
-
-            /* Change SIBS setting */
-            if(!is_sibs_enabled()) {
-                if(nvm_ptr->tag_id == 17){
-                    *nvm_byte_ptr = ((*nvm_byte_ptr) & ~(0x80));
+            if(ptlv_header->tlv_type == TLV_TYPE_BT_NVM) {
+                /* Write BD Address */
+                if(nvm_ptr->tag_id == TAG_NUM_2){
+                    memcpy(nvm_byte_ptr, vnd_local_bd_addr, 6);
+                    ALOGI("BD Address: %.02x:%.02x:%.02x:%.02x:%.02x:%.02x",
+                        *nvm_byte_ptr, *(nvm_byte_ptr+1), *(nvm_byte_ptr+2),
+                        *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
                 }
 
-                if(nvm_ptr->tag_id == 27){
-                    *nvm_byte_ptr = ((*nvm_byte_ptr) & ~(0x01));
+                /* Change SIBS setting */
+                if(!is_sibs_enabled()) {
+                    if(nvm_ptr->tag_id == 17){
+                        *nvm_byte_ptr = ((*nvm_byte_ptr) & ~(0x80));
+                    }
+
+                    if(nvm_ptr->tag_id == 27){
+                        *nvm_byte_ptr = ((*nvm_byte_ptr) & ~(0x01));
+                    }
                 }
             }
-
             for(i =0;(i<nvm_ptr->tag_len && (i*3 + 2) <PRINT_BUF_SIZE);i++)
                 snprintf((char *) data_buf, PRINT_BUF_SIZE, "%s%.02x ", (char *)data_buf, *(nvm_byte_ptr + i));
 
@@ -943,6 +959,22 @@ int rome_get_tlv_file(char *file_path)
             /* increased by tag_len */
             nvm_index+=nvm_ptr->tag_len;
             nvm_byte_ptr +=nvm_ptr->tag_len;
+        }
+
+        nvm_tot_len -= nvm_index;
+
+        if (nvm_tot_len > 4 ) {
+            nvm_byte_ptr = ptlv_header;
+            nvm_byte_ptr +=(4+nvm_index);
+            ptlv_header = nvm_byte_ptr;
+            nvm_tot_len -=4;
+            ALOGI("====================================================");
+            ALOGI("TLV Type\t\t\t : 0x%x", ptlv_header->tlv_type);
+            ALOGI("Length\t\t\t : %d bytes",  nvm_length = (ptlv_header->tlv_length1) |
+                                                        (ptlv_header->tlv_length2 << 8) |
+                                                        (ptlv_header->tlv_length3 << 16));
+            ALOGI("====================================================");
+            goto multi_nvm;
         }
 
         ALOGI("====================================================");
@@ -1941,6 +1973,10 @@ int rome_soc_init(int fd, char *bdaddr)
         case CHEROKEE_VER_1_0:
             rampatch_file_path = CHEROKEE_RAMPATCH_TLV_1_0_PATH;
             nvm_file_path = CHEROKEE_NVM_TLV_1_0_PATH;
+            goto download;
+        case CHEROKEE_VER_1_1:
+            rampatch_file_path = CHEROKEE_RAMPATCH_TLV_1_1_PATH;
+            nvm_file_path = CHEROKEE_NVM_TLV_1_1_PATH;
             goto download;
         case CHEROKEE_VER_2_0:
             rampatch_file_path = CHEROKEE_RAMPATCH_TLV_2_0_PATH;

@@ -128,7 +128,9 @@
 
 /* TLV_TYPE */
 #define TLV_TYPE_PATCH                  (1)
-#define TLV_TYPE_NVM                      (2)
+#define TLV_TYPE_BT_NVM                (2)
+#define TLV_TYPE_FM_NVM               (3)
+#define TLV_TYPE_BT_FM_NVM        (4)
 
 /* NVM */
 #define MAX_TAG_CMD                 30
@@ -162,21 +164,20 @@
 #define ROME_NVM_TLV_3_0_0_PATH         "/bt_firmware/image/btnv30.bin"
 #define ROME_RAMPATCH_TLV_3_0_2_PATH    "/bt_firmware/image/btfw32.tlv"
 #define ROME_NVM_TLV_3_0_2_PATH         "/bt_firmware/image/btnv32.bin"
-//#define ROME_RAMPATCH_TLV_3_0_0_PATH    "/system/etc/firmware/rampatch_tlv_3.0.tlv"
-//#define ROME_NVM_TLV_3_0_0_PATH         "/system/etc/firmware/nvm_tlv_3.0.bin"
-//#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/system/etc/firmware/rampatch_tlv_3.2.tlv"
-//#define ROME_NVM_TLV_3_0_2_PATH         "/system/etc/firmware/nvm_tlv_3.2.bin"
+
 #define CHEROKEE_RAMPATCH_TLV_1_0_PATH    "/bt_firmware/image/crbtfw10.tlv"
-#define CHEROKEE_NVM_TLV_1_0_PATH         "/bt_firmware/image/crbtnv10.bin"
+#define CHEROKEE_NVM_TLV_1_0_PATH         "/bt_firmware/image/crnv10.bin"
+#define CHEROKEE_RAMPATCH_TLV_1_1_PATH    "/bt_firmware/image/crbtfw11.tlv"
+#define CHEROKEE_NVM_TLV_1_1_PATH         "/bt_firmware/image/crnv11.bin"
 #define CHEROKEE_RAMPATCH_TLV_2_0_PATH    "/bt_firmware/image/crbtfw20.tlv"
-#define CHEROKEE_NVM_TLV_2_0_PATH         "/bt_firmware/image/crbtnv20.bin"
+#define CHEROKEE_NVM_TLV_2_0_PATH         "/bt_firmware/image/crnv20.bin"
 #define CHEROKEE_RAMPATCH_TLV_2_1_PATH    "/bt_firmware/image/crbtfw21.tlv"
-#define CHEROKEE_NVM_TLV_2_1_PATH         "/bt_firmware/image/crbtnv21.bin"
+#define CHEROKEE_NVM_TLV_2_1_PATH         "/bt_firmware/image/crnv21.bin"
 #define CHEROKEE_RAMPATCH_TLV_3_0_PATH    "/bt_firmware/image/crbtfw30.tlv"
-#define CHEROKEE_NVM_TLV_3_0_PATH         "/bt_firmware/image/crbtnv30.bin"
+#define CHEROKEE_NVM_TLV_3_0_PATH         "/bt_firmware/image/crnv30.bin"
 
 #define CHEROKEE_RAMPATCH_TLV_1_0_PATH_ALT    "/system/etc/firmware/crbtfw10.tlv"
-#define CHEROKEE_NVM_TLV_1_0_PATH_ALT         "/system/etc/firmware/crbtnv10.bin"
+#define CHEROKEE_NVM_TLV_1_0_PATH_ALT         "/system/etc/firmware/crnv10.bin"
 
 #define ROME_3_1_FW_SU  "bprm.cnss.3.1"
 #define ROME_3_2_FW_SU  "btfwp.cnss.3.2"
@@ -314,6 +315,7 @@ enum{
 enum{
     CHEROKEE_BUILD_VER_0000   = 0x1100,
     CHEROKEE_BUILD_VER_0100   = 0x0100,
+    CHEROKEE_BUILD_VER_0101   = 0x0101,
     CHEROKEE_BUILD_VER_0200   = 0x0200,
     CHEROKEE_BUILD_VER_0201   = 0x0201,
     CHEROKEE_BUILD_VER_0300   = 0x0300
@@ -332,6 +334,7 @@ enum{
     CHEROKEE_VER_0_1 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0100) | QCA_CHEROKEE_SOC_ID_0100 ),
     /* Silicon*/
     CHEROKEE_VER_1_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0100) ),
+    CHEROKEE_VER_1_1 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0101) ),
     CHEROKEE_VER_2_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0200) |(QCA_CHEROKEE_SOC_ID_0200)),
     CHEROKEE_VER_2_1 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0201) |(QCA_CHEROKEE_SOC_ID_0210)),
     CHEROKEE_VER_3_0 = ((PROD_ID_CHEROKEE << 24) | (CHEROKEE_BUILD_VER_0300) |(QCA_CHEROKEE_SOC_ID_0300))
