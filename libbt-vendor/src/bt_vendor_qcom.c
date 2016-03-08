@@ -815,6 +815,10 @@ userial_open:
                                         retval = -1;
                                         break;
                                     }
+
+                                    /* Clock off */
+                                    userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
+
                                     /* Close uart port for the reset handler */
                                     userial_vendor_close();
                                     fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
@@ -823,6 +827,9 @@ userial_open:
                                         retval = -1;
                                         break;
                                     }
+
+                                    /* Clock on */
+                                    userial_clock_operation(fd, USERIAL_OP_CLK_ON);
 
                                     /* For Cherokee, it need to wait for 100ms */
                                     usleep(100*1000);
