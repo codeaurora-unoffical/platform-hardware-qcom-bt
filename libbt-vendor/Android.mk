@@ -36,7 +36,12 @@ endif
 
 ifeq ($(BOARD_HAS_QCA_BT_ROME),true)
 LOCAL_CFLAGS += -DBT_SOC_TYPE_ROME
+else ifeq ($(BOARD_HAS_QCA_BT_SOC), "cherokee")
+LOCAL_CFLAGS += -DBT_SOC_TYPE_CHEROKEE
+#Disable this flag in case if FM over UART support not needed
+LOCAL_CFLAGS += -DFM_OVER_UART
 endif
+
 
 ifneq (,$(filter userdebug eng,$(TARGET_BUILD_VARIANT)))
 LOCAL_CFLAGS += -DPANIC_ON_SOC_CRASH
