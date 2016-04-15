@@ -20,6 +20,33 @@
 #include "bt_vendor_lib.h"
 //#include "vnd_buildcfg.h"
 
+#ifndef ANDROID
+#include <stdio.h>
+#include <sys/ioctl.h>
+#define property_get prop_get
+#define property_set prop_set
+
+#define LOG_TAG "libbt-vendor"
+
+#define PRI_INFO " I"
+#define PRI_WARN " W"
+#define PRI_ERROR " E"
+#define PRI_DEBUG " D"
+#define PRI_VERB " V"
+
+#define ALOG(pri, tag, fmt, arg...) fprintf(stderr, tag pri ": " fmt"\n", ##arg)
+#define ALOGV(fmt, arg...) ALOG(PRI_VERB, LOG_TAG, fmt, ##arg)
+#define ALOGD(fmt, arg...) ALOG(PRI_DEBUG, LOG_TAG, fmt, ##arg)
+#define ALOGI(fmt, arg...) ALOG(PRI_INFO, LOG_TAG, fmt, ##arg)
+#define ALOGW(fmt, arg...) ALOG(PRI_WARN, LOG_TAG, fmt, ##arg)
+#define ALOGE(fmt, arg...) ALOG(PRI_ERROR, LOG_TAG, fmt, ##arg)
+
+#define LOG_VERBOSE(fmt, arg...) ALOG(PRI_VERB, LOG_TAG, fmt, ##arg)
+#define LOG_DEBUG(fmt, arg...) ALOG(PRI_DEBUG, LOG_TAG, fmt, ##arg)
+#define LOG_INFO(fmt, arg...) ALOG(PRI_INFO, LOG_TAG, fmt, ##arg)
+#define LOG_WARN(fmt, arg...) ALOG(PRI_WARN, LOG_TAG, fmt, ##arg)
+#define LOG_ERROR(fmt, arg...) ALOG(PRI_ERROR, LOG_TAG, fmt, ##arg)
+#endif
 
 #ifndef FALSE
 #define FALSE  0
@@ -38,6 +65,7 @@ typedef enum {
     BT_SOC_SMD = BT_SOC_DEFAULT,
     BT_SOC_ROME,
     BT_SOC_AR3K,
+    BT_SOC_CHEROKEE,
     /* Add chipset type here */
     BT_SOC_RESERVED
 }bt_soc_type;

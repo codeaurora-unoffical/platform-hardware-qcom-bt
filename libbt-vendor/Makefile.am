@@ -1,0 +1,34 @@
+# sources and intermediate files are separated
+
+AM_CFLAGS = -Wall \
+        -Wundef \
+        -Wstrict-prototypes \
+        -Wno-trigraphs \
+        -std=c99 \
+        -DBT_SOC_TYPE_ROME \
+        -DBT_NV_SUPPORT
+
+AM_CPPFLAGS = -Iinclude \
+        -I${WORKSPACE}/system/bt/hci/include \
+        -I${WORKSPACE}/vendor/qcom/proprietary/bt/hci_qcomm_init/ \
+        -DBT_NV_SUPPORT
+
+c_sources = \
+        src/bt_vendor_qcom.c \
+        src/hardware.c \
+        src/hci_uart.c \
+        src/hci_smd.c \
+        src/hw_rome.c \
+        src/hw_ar3k.c \
+        src/bt_vendor_persist.cpp
+
+requiredlibs = -lpthread -lcutils $(SYS_LIB)/libbtnv.la
+library_includedir = $(pkgincludedir)\
+library_include_HEADERS = $(h_sources)
+lib_LTLIBRARIES = libbt-vendor.la
+libbt_vendor_la_CC = @CC@
+libbt_vendor_la_SOURCES = $(c_sources)
+libbt_vendor_la_CPPFLAGS =$(AM_CPPFLAGS)
+libbt_vendor_la_LIBADD = $(requiredlibs)
+libbt_vendor_la_CFLAGS = $(AM_CFLAGS) -fPIC -D_GNU_SOURCE -D__KERNEL__
+libbt_vendor_la_LDFLAGS = -shared

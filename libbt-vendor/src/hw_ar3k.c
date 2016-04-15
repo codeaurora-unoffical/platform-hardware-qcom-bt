@@ -34,8 +34,14 @@ extern "C" {
 
 #define LOG_TAG "bt_vendor"
 
-#include <sys/socket.h>
+#ifdef ANDROID
 #include <utils/Log.h>
+#else
+#include <stdio.h>
+#include "bt_vendor_qcom.h"
+#include <sys/socket.h>
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>

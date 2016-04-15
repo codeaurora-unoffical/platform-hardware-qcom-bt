@@ -28,8 +28,11 @@
 
 #ifdef BT_NV_SUPPORT
 #include "bt_nv.h"
+#ifdef ANDROID
 #include <utils/Log.h>
-
+#else
+#include "bt_vendor_qcom.h"
+#endif
 /*===========================================================================
 FUNCTION   bt_vendor_nv_read
 

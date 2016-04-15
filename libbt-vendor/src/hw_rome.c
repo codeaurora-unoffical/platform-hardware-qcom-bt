@@ -35,7 +35,12 @@ extern "C" {
 #define LOG_TAG "bt_vendor"
 
 #include <sys/socket.h>
+#ifdef ANDROID
 #include <utils/Log.h>
+#else
+#include <stdio.h>
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
@@ -54,7 +59,11 @@ extern "C" {
 #include "hci_uart.h"
 #include "hw_rome.h"
 
+#ifdef ANDROID
 #define BT_VERSION_FILEPATH "/data/misc/bluedroid/bt_fw_version.txt"
+#else
+#define BT_VERSION_FILEPATH "/etc/data/misc/bluedroid/bt_fw_version.txt"
+#endif
 
 #ifdef __cplusplus
 }
