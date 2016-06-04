@@ -150,6 +150,17 @@
 #define EXTRACT_BYTE(val, pos)      (char) (((val) >> (8 * (pos))) & 0xFF)
 #define CALC_SEG_SIZE(len, max)   ((plen) % (max))?((plen/max)+1) : ((plen) / (max))
 
+#define CHEROKEE_RAMPATCH_TLV_1_0_PATH    "/bt_firmware/image/crbtfw10.tlv"
+#define CHEROKEE_NVM_TLV_1_0_PATH         "/bt_firmware/image/crnv10.bin"
+#define CHEROKEE_RAMPATCH_TLV_1_1_PATH    "/bt_firmware/image/crbtfw11.tlv"
+#define CHEROKEE_NVM_TLV_1_1_PATH         "/bt_firmware/image/crnv11.bin"
+#define CHEROKEE_RAMPATCH_TLV_2_0_PATH    "/bt_firmware/image/crbtfw20.tlv"
+#define CHEROKEE_NVM_TLV_2_0_PATH         "/bt_firmware/image/crnv20.bin"
+#define CHEROKEE_RAMPATCH_TLV_2_1_PATH    "/bt_firmware/image/crbtfw21.tlv"
+#define CHEROKEE_NVM_TLV_2_1_PATH         "/bt_firmware/image/crnv21.bin"
+#define CHEROKEE_RAMPATCH_TLV_3_0_PATH    "/bt_firmware/image/crbtfw30.tlv"
+#define CHEROKEE_NVM_TLV_3_0_PATH         "/bt_firmware/image/crnv30.bin"
+
 #define ROME_FW_PATH        "/system/etc/firmware/rampatch.img"
 #define ROME_RAMPATCH_TLV_PATH      "/system/etc/firmware/rampatch_tlv.img"
 #define ROME_NVM_TLV_PATH         "/system/etc/firmware/nvm_tlv.bin"
@@ -157,14 +168,18 @@
 #define ROME_NVM_TLV_1_0_3_PATH         "/system/etc/firmware/nvm_tlv_1.3.bin"
 #define ROME_RAMPATCH_TLV_2_0_1_PATH    "/system/etc/firmware/rampatch_tlv_2.1.tlv"
 #define ROME_NVM_TLV_2_0_1_PATH         "/system/etc/firmware/nvm_tlv_2.1.bin"
+#ifdef ANDROID
 #define ROME_RAMPATCH_TLV_3_0_0_PATH    "/bt_firmware/image/btfw30.tlv"
 #define ROME_NVM_TLV_3_0_0_PATH         "/bt_firmware/image/btnv30.bin"
 #define ROME_RAMPATCH_TLV_3_0_2_PATH    "/bt_firmware/image/btfw32.tlv"
 #define ROME_NVM_TLV_3_0_2_PATH         "/bt_firmware/image/btnv32.bin"
-//#define ROME_RAMPATCH_TLV_3_0_0_PATH    "/system/etc/firmware/rampatch_tlv_3.0.tlv"
-//#define ROME_NVM_TLV_3_0_0_PATH         "/system/etc/firmware/nvm_tlv_3.0.bin"
-//#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/system/etc/firmware/rampatch_tlv_3.2.tlv"
-//#define ROME_NVM_TLV_3_0_2_PATH         "/system/etc/firmware/nvm_tlv_3.2.bin"
+#else
+#define ROME_RAMPATCH_TLV_3_0_0_PATH    "/lib/firmware/btfw30.tlv"
+#define ROME_NVM_TLV_3_0_0_PATH         "/lib/firmware/btnv30.bin"
+#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/lib/firmware/btfw32.tlv"
+#define ROME_NVM_TLV_3_0_2_PATH         "/lib/firmware/btnv32.bin"
+#endif
+
 
 #define ROME_3_1_FW_SU  "bprm.cnss.3.1"
 #define ROME_3_2_FW_SU  "btfwp.cnss.3.2"

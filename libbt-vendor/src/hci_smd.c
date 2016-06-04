@@ -24,7 +24,9 @@
 
 #define LOG_TAG "bt_vendor"
 
+#ifdef ANDROID
 #include <utils/Log.h>
+#endif
 #include <termios.h>
 #include <fcntl.h>
 #include <errno.h>

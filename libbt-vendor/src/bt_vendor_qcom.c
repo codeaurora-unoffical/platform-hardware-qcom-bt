@@ -27,7 +27,18 @@
 #define LOG_TAG "bt_vendor"
 #define BLUETOOTH_MAC_ADDR_BOOT_PROPERTY "ro.boot.btmacaddr"
 
+#ifdef ANDROID
 #include <utils/Log.h>
+#else
+#include <sys/types.h>
+#include <stdio.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <sys/socket.h>
+#include <string.h>
+#include <sys/time.h>
+#include <fcntl.h>
+#endif
 #include <cutils/properties.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -40,6 +51,7 @@
 #include "bt_vendor_persist.h"
 #include "hw_rome.h"
 #include "bt_vendor_lib.h"
+
 #define WAIT_TIMEOUT 200000
 #define BT_VND_OP_GET_LINESPEED 12
 
@@ -50,6 +62,15 @@
 #endif
 
 #define CMD_TIMEOUT  0x22
+
+#ifdef ANDROID
+#define ANT_SOCK "ant_sock"
+#define BT_SOCK "bt_sock"
+#else
+#define ANT_SOCK "/etc/bluetooth/ant_sock"
+#define BT_SOCK "/etc/bluetooth/bt_sock"
+#define SOCKETNAME  "/etc/bluetooth/btprop"
+#endif
 
 static void wait_for_patch_download(bool is_ant_req);
 static bool is_debug_force_special_bytes(void);
@@ -78,7 +99,9 @@ static int btSocType = BT_SOC_DEFAULT;
 static int rfkill_id = -1;
 static char *rfkill_state = NULL;
 bool enable_extldo = FALSE;
-
+#ifndef ANDROID
+static int bt_prop_socket;      /* This end of connection*/
+#endif
 int userial_clock_operation(int fd, int cmd);
 int ath3k_init(int fd, int speed, int init_speed, char *bdaddr, struct termios *ti);
 int rome_soc_init(int fd, char *bdaddr);
@@ -205,8 +228,8 @@ static int get_bt_soc_type()
     ALOGI("bt-vendor : get_bt_soc_type");
 
     ret = property_get("qcom.bluetooth.soc", bt_soc_type, NULL);
-    if (ret != 0) {
-        ALOGI("qcom.bluetooth.soc set to %s\n", bt_soc_type);
+    if (!ret) {
+        ALOGE("qcom.bluetooth.soc set to %s\n", bt_soc_type);
         if (!strncasecmp(bt_soc_type, "rome", sizeof("rome"))) {
             return BT_SOC_ROME;
         }
@@ -316,11 +339,11 @@ void start_hci_filter() {
        for(i=0; i<45; i++) {
           property_get("wc_transport.hci_filter_status", value, "0");
           if (strcmp(value, "1") == 0) {
-               init_success = 1;
-               break;
-           } else {
-               usleep(WAIT_TIMEOUT);
-           }
+             init_success = 1;
+             break;
+          } else {
+             usleep(WAIT_TIMEOUT);
+          }
         }
         ALOGV("start_hcifilter status:%d after %f seconds \n", init_success, 0.2*i);
 
@@ -345,6 +368,7 @@ static int bt_powerup(int en )
 
     ALOGI("bt_powerup: %c", on);
 
+#ifdef ANDROID
     /* Check if rfkill has been disabled */
     ret = property_get("ro.rfkilldisabled", disable, "0");
     if (!ret ){
@@ -356,6 +380,7 @@ static int bt_powerup(int en )
         ALOGI("ro.rfkilldisabled : %s", disable);
         return -1;
     }
+#endif
 
 #ifdef WIFI_BT_STATUS_SYNC
     lock_fd = bt_semaphore_create();
@@ -412,6 +437,8 @@ static int bt_powerup(int en )
         goto done;
     }
 #endif
+
+#ifdef ANDROID
     ret = asprintf(&enable_ldo_path, "/sys/class/rfkill/rfkill%d/device/extldo", rfkill_id);
     if( (ret < 0 ) || (enable_ldo_path == NULL) )
     {
@@ -432,6 +459,7 @@ static int bt_powerup(int en )
         ALOGI("External LDO has been configured");
         enable_extldo = TRUE;
     }
+#endif
 
     ALOGE("Write %c to rfkill\n", on);
 
@@ -518,6 +546,29 @@ static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
         return -1;
     }
 
+#ifndef ANDROID
+    int len;    /* length of sockaddr */
+    struct sockaddr_un name;
+    if( (bt_prop_socket = socket(AF_UNIX, SOCK_STREAM, 0) ) < 0) {
+      perror("socket");
+      exit(1);
+    }
+    /*Create the address of the server.*/
+    memset(&name, 0, sizeof(struct sockaddr_un));
+    name.sun_family = AF_UNIX;
+    strncpy(name.sun_path, SOCKETNAME, strlen(SOCKETNAME));
+    ALOGE("connecting to %s, fd = %d", SOCKETNAME, bt_prop_socket);
+    len = sizeof(name.sun_family) + strlen(name.sun_path);
+    /*Connect to the server.*/
+    if (connect(bt_prop_socket, (struct sockaddr *) &name, len) < 0){
+        perror("connect");
+        exit(1);
+    }
+#if (BT_SOC_TYPE_ROME ||BT_SOC_TYPE_CHEROKEE)
+    property_set("qcom.bluetooth.soc", "rome");
+#endif
+#endif
+
     if ((btSocType = get_bt_soc_type()) < 0) {
         ALOGE("%s: Failed to detect BT SOC Type", __FUNCTION__);
         return -1;
@@ -589,6 +640,9 @@ static bool validate_tok(char* bdaddr_tok) {
 
 int connect_to_local_socket(char* name) {
        socklen_t len; int sk = -1;
+#ifndef ANDROID
+       struct sockaddr_un addr;
+#endif
 
        ALOGE("%s: ACCEPT ", __func__);
        sk  = socket(AF_LOCAL, SOCK_STREAM, 0);
@@ -596,17 +650,24 @@ int connect_to_local_socket(char* name) {
            ALOGE("Socket creation failure");
            return -1;
        }
-
-        if(socket_local_client_connect(sk, name,
-            ANDROID_SOCKET_NAMESPACE_ABSTRACT, SOCK_STREAM) < 0)
-        {
-             ALOGE("failed to connect (%s)", strerror(errno));
-             close(sk);
-             sk = -1;
-        } else {
-                ALOGE("%s: Connection succeeded\n", __func__);
-        }
-        return sk;
+#ifdef ANDROID
+       if(socket_local_client_connect(sk, name,
+          ANDROID_SOCKET_NAMESPACE_ABSTRACT, SOCK_STREAM) < 0)
+#else
+       memset(&addr, 0, sizeof(addr));
+       addr.sun_family = AF_LOCAL;
+       memcpy(addr.sun_path, name, strlen(name));
+       ALOGE("connect_to_local_socket: addr.sun_path = %s", addr.sun_path);
+       if (connect(sk, (struct sockaddr *) &addr, sizeof(addr)) < 0)
+#endif
+       {
+           ALOGE("failed to connect (%s)", strerror(errno));
+           close(sk);
+           sk = -1;
+       } else {
+           ALOGE("%s: Connection succeeded\n", __func__);
+       }
+       return sk;
 }
 
 bool is_soc_initialized() {
@@ -617,7 +678,7 @@ bool is_soc_initialized() {
     ALOGI("bt-vendor : is_soc_initialized");
 
     ret = property_get("wc_transport.soc_initialized", init_value, NULL);
-    if (ret != 0) {
+    if (!ret) {
         ALOGI("wc_transport.soc_initialized set to %s\n", init_value);
         if (!strncasecmp(init_value, "1", sizeof("1"))) {
             init = true;
@@ -836,12 +897,14 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                         ignore_boot_prop = TRUE;
                                     }
 #endif //READ_BT_ADDR_FROM_PROP
+#ifdef BT_NV_SUPPORT
                                     /* Always read BD address from NV file */
                                     if(ignore_boot_prop && !bt_vendor_nv_read(1, vnd_local_bd_addr))
                                     {
                                        /* Since the BD address is configured in boot time We should not be here */
                                        ALOGI("Failed to read BD address. Use the one from bluedroid stack/ftm");
                                     }
+#endif
                                     if(rome_soc_init(fd, (char*)vnd_local_bd_addr)<0) {
                                         retval = -1;
                                     } else {
@@ -856,52 +919,53 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                             }
 
                             property_set("wc_transport.clean_up","0");
+
                             if (retval != -1) {
-#ifdef BT_SOC_TYPE_ROME
-                                 start_hci_filter();
-                                 if (is_ant_req) {
-                                     ALOGV("connect to ant channel");
-                                     ant_fd = fd_filter = connect_to_local_socket("ant_sock");
-                                 }
-                                 else
+#if (BT_SOC_TYPE_ROME ||BT_SOC_TYPE_CHEROKEE)
+                                start_hci_filter();
+                                if (is_ant_req) {
+                                    ALOGV("connect to ant channel");
+                                    ant_fd = fd_filter = connect_to_local_socket(ANT_SOCK);
+                                }
+                                else
 #endif
-                                 {
-                                     ALOGV("connect to bt channel");
-                                     vnd_userial.fd = fd_filter = connect_to_local_socket("bt_sock");
-                                 }
+                                {
+                                    ALOGV("connect to bt channel");
+                                    vnd_userial.fd = fd_filter = connect_to_local_socket(BT_SOCK);
+                                }
 
-                                 if (fd_filter != -1) {
-                                     ALOGV("%s: received the socket fd: %d is_ant_req: %d\n",
-                                                                 __func__, fd_filter, is_ant_req);
-                                     if((strcmp(emb_wp_mode, "true") == 0) && !is_ant_req) {
-                                         if (rome_ver >= ROME_VER_3_0) {
-                                             /*  get rome supported feature request */
-                                             ALOGE("%s: %x08 %0x", __FUNCTION__,rome_ver, ROME_VER_3_0);
-                                             rome_get_addon_feature_list(fd_filter);
-                                         }
-                                     }
-                                     if (!skip_init) {
-                                         /*Skip if already sent*/
-                                         enable_controller_log(fd_filter, is_ant_req);
-                                         skip_init = true;
-                                     }
+                                if (fd_filter != -1) {
+                                    ALOGV("%s: received the socket fd: %d is_ant_req: %d\n",
+                                                                __func__, fd_filter, is_ant_req);
+                                    if((strcmp(emb_wp_mode, "true") == 0) && !is_ant_req) {
+                                        if (rome_ver >= ROME_VER_3_0) {
+                                            /*  get rome supported feature request */
+                                            ALOGE("%s: %x08 %0x", __FUNCTION__,rome_ver, ROME_VER_3_0);
+                                            rome_get_addon_feature_list(fd_filter);
+                                        }
+                                    }
+                                    if (!skip_init) {
+                                        /*Skip if already sent*/
+                                        enable_controller_log(fd_filter, is_ant_req);
+                                        skip_init = true;
+                                    }
 
-                                     for (idx=0; idx < CH_MAX; idx++) {
-                                         (*fd_array)[idx] = fd_filter;
-                                     }
+                                    for (idx=0; idx < CH_MAX; idx++) {
+                                        (*fd_array)[idx] = fd_filter;
+                                    }
 
-                                     retval = 1;
-                                 }
-                                 else {
-                                     retval = -1;
-                                 }
-                             }
+                                    retval = 1;
+                                }
+                                else {
+                                    retval = -1;
+                                }
+                            }
 
-                             if (fd >= 0) {
-                                 userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
-                                 /*Close the UART port*/
-                                 close(fd);
-                             }
+                            if (fd >= 0) {
+                                userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
+                                /*Close the UART port*/
+                                close(fd);
+                            }
                         }
                         break;
                     default:
@@ -1127,7 +1191,11 @@ static void cleanup( void )
 {
     ALOGI("cleanup");
     bt_vendor_cbacks = NULL;
-
+#ifndef ANDROID
+    ALOGE("calling shutdown of fd = %d", bt_prop_socket);
+    shutdown(bt_prop_socket, SHUT_RDWR);
+    close(bt_prop_socket);
+#endif
 #ifdef WIFI_BT_STATUS_SYNC
     isInit = 0;
 #endif /* WIFI_BT_STATUS_SYNC */
@@ -1181,3 +1249,45 @@ const bt_vendor_interface_t BLUETOOTH_VENDOR_LIB_INTERFACE = {
     cleanup,
     ssr_cleanup
 };
+
+#ifndef ANDROID
+int property_get(const char *key, char *value, const char *default_value)
+{
+    char prop_string[200];
+    int ret, bytes_read = 0, i = 0;
+    sprintf(prop_string, "get_property %s,", key);
+    ret = send(bt_prop_socket, prop_string, strlen(prop_string), 0);
+    memset(value, 0, sizeof(value));
+    do
+    {
+        bytes_read = recv(bt_prop_socket, &value[i], 1, 0);
+        if (bytes_read == 1)
+        {
+            if (value[i] == ',')
+            {
+                value[i] = '\0';
+                break;
+            }
+            i++;
+        }
+    } while(1);
+    ALOGD("property_get: key(%s) has value: %s", key, value);
+    if (bytes_read) {
+        return 0;
+    } else {
+        strncpy(value, default_value, strlen(default_value));
+        return 1;
+    }
+}
+
+int property_set(const char *key, const char *value)
+{
+    char prop_string[200];
+    int ret;
+    sprintf(prop_string, "set_property %s %s,", key, value);
+    ALOGD("property_set: setting key(%s) to value: %s\n", key, value);
+    ret = send(bt_prop_socket, prop_string, strlen(prop_string), 0);
+    return 0;
+}
+#endif
+

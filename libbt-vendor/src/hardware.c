@@ -26,7 +26,12 @@
 
 #define LOG_TAG "bt_vendor"
 
+#ifdef ANDROID
 #include <utils/Log.h>
+#else
+#include <sys/types.h>
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
