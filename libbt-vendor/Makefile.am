@@ -10,7 +10,7 @@ AM_CFLAGS = -Wall \
 
 AM_CPPFLAGS = -Iinclude \
         -I${WORKSPACE}/system/bt/hci/include \
-        -I${WORKSPACE}/vendor/qcom/proprietary/bt/hci_qcomm_init/ \
+        -I${D}${includedir} \
         -DBT_NV_SUPPORT
 
 c_sources = \
