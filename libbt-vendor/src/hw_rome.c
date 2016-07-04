@@ -163,30 +163,32 @@ int get_vs_hci_event(unsigned char *rsp)
         {
             case EDL_PATCH_VER_RES_EVT:
             case EDL_APP_VER_RES_EVT:
-                ALOGI("\t Current Product ID\t\t: 0x%08x",
-                    productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET +3] << 24 |
+                productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET +3] << 24 |
                                         rsp[PATCH_PROD_ID_OFFSET+2] << 16 |
                                         rsp[PATCH_PROD_ID_OFFSET+1] << 8 |
-                                        rsp[PATCH_PROD_ID_OFFSET]  ));
+                                        rsp[PATCH_PROD_ID_OFFSET]  );
+                ALOGI("\t Current Product ID\t\t: 0x%08x", productid);
 
                 /* Patch Version indicates FW patch version */
-                ALOGI("\t Current Patch Version\t\t: 0x%04x",
-                    (patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET + 1] << 8 |
-                                            rsp[PATCH_PATCH_VER_OFFSET] )));
+                patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET + 1] << 8 |
+                                            rsp[PATCH_PATCH_VER_OFFSET] );
+                ALOGI("\t Current Patch Version\t\t: 0x%04x", patchversion);
 
                 /* ROM Build Version indicates ROM build version like 1.0/1.1/2.0 */
-                ALOGI("\t Current ROM Build Version\t: 0x%04x", rome_ver =
+                rome_ver =
                     (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET + 1] << 8 |
-                                            rsp[PATCH_ROM_BUILD_VER_OFFSET] ));
+                                            rsp[PATCH_ROM_BUILD_VER_OFFSET] );
+                ALOGI("\t Current ROM Build Version\t: 0x%04x", rome_ver);
 
                 /* In case rome 1.0/1.1, there is no SOC ID version available */
                 if (paramlen - 10)
                 {
-                    ALOGI("\t Current SOC Version\t\t: 0x%08x", soc_id =
+                    soc_id =
                         (unsigned int)(rsp[PATCH_SOC_VER_OFFSET +3] << 24 |
                                                 rsp[PATCH_SOC_VER_OFFSET+2] << 16 |
                                                 rsp[PATCH_SOC_VER_OFFSET+1] << 8 |
-                                                rsp[PATCH_SOC_VER_OFFSET]  ));
+                                                rsp[PATCH_SOC_VER_OFFSET]  );
+                    ALOGI("\t Current SOC Version\t\t: 0x%08x", soc_id);
                 }
 
                 if (NULL != (btversionfile = fopen(BT_VERSION_FILEPATH, "wb"))) {
