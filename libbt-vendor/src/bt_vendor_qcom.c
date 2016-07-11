@@ -640,6 +640,17 @@ bool is_soc_initialized() {
     return init;
 }
 
+bool is_fw_download_completed(void) {
+    ALOGV("%s:", __FUNCTION__);
+    bool status = false;
+    char is_completed[PROPERTY_VALUE_MAX] = {'\0'};
+    if (property_get("wc_transport.patch_dnld_cmp", is_completed, "no") &&
+        !strcmp(is_completed, "yes")) {
+        status = true;
+    }
+    return status;
+}
+
 
 /** Requested operations */
 static int op(bt_vendor_opcode_t opcode, void *param)
@@ -682,7 +693,16 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     case BT_SOC_ROME:
                     case BT_SOC_AR3K:
                         /* BT Chipset Power Control through Device Tree Node */
-                        retval = bt_powerup(nState);
+                        if (is_fw_download_completed()) {
+                            // reset the BT fw downaload property so that next
+                            // power control takes on with normal path
+                            if (nState == BT_VND_PWR_ON) {
+                                ALOGD("bt-vendor : reset bt fw download property");
+                                property_set("wc_transport.patch_dnld_cmp", "no");
+                            }
+                        } else {
+                            retval = bt_powerup(nState);
+                        }
                     default:
                         break;
                 }
@@ -708,6 +728,60 @@ static int op(bt_vendor_opcode_t opcode, void *param)
             {
                 if (bt_vendor_cbacks)
                     bt_vendor_cbacks->scocfg_cb(BT_VND_OP_RESULT_SUCCESS); //dummy
+            }
+            break;
+
+        case BT_VND_OP_FW_DOWNLOAD:
+            switch(btSocType)
+            {
+                case BT_SOC_ROME:
+                    {
+                        property_get("persist.BT3_2.version", bt_version, false);
+                        if (!is_soc_initialized()) {
+                            int fd = userial_vendor_open((tUSERIAL_CFG *) &userial_init_cfg);
+                            if (fd < 0) {
+                                ALOGE("userial_vendor_open returns err");
+                                retval = -1;
+                            } else {
+                                /* Clock on */
+                                userial_clock_operation(fd, USERIAL_OP_CLK_ON);
+                                ALOGD("userial clock on");
+                                if (strcmp(bt_version, "true") == 0) {
+                                    property_get("ro.bluetooth.wipower", wipower_status, false);
+                                    if (strcmp(wipower_status, "true") == 0) {
+                                        check_embedded_mode(fd);
+                                    } else {
+                                        ALOGI("Wipower not enabled");
+                                    }
+                                }
+                                ALOGV("rome_soc_init is started");
+                                property_set("wc_transport.soc_initialized", "0");
+
+                                /* Always read BD address from NV file */
+                                if (!bt_vendor_nv_read(1, vnd_local_bd_addr)) {
+                                    /* Since the BD address is configured in boot
+                                     * time we should not be here
+                                     */
+                                    ALOGI("Failed to read BD address. Use the one from bluedroid stack/ftm");
+                                }
+                                if (rome_soc_init(fd, vnd_local_bd_addr) < 0) {
+                                    retval = -1;
+                                } else {
+                                    ALOGV("rome_soc_init is completed");
+                                    property_set("wc_transport.soc_initialized", "1");
+                                    property_set("wc_transport.patch_dnld_cmp", "yes");
+                                }
+                                userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
+                                /*Close the UART port*/
+                                close(fd);
+                                start_hci_filter();
+                            }
+                        }
+                    }
+                    break;
+                default:
+                    ALOGE(" Operation FW download Not handled for btSocType: 0x%x", btSocType);
+                    break;
             }
             break;
 #ifdef BT_SOC_TYPE_ROME
