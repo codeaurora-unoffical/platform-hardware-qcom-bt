@@ -5,7 +5,6 @@ AM_CFLAGS = -Wall \
         -Wstrict-prototypes \
         -Wno-trigraphs \
         -std=c99 \
-        -DBT_SOC_TYPE_ROME \
         -DBT_NV_SUPPORT
 
 AM_CPPFLAGS = -Iinclude \

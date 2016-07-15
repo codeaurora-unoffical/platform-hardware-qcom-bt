@@ -691,6 +691,41 @@ bool is_soc_initialized() {
     return init;
 }
 
+#ifndef ANDROID
+int bt_onoff_script(void)
+{
+   int prop_ret = 0;
+   int ret = -1;
+   char hciattach_value[PROPERTY_VALUE_MAX];
+   prop_ret = property_get("bluetooth.hciattach", hciattach_value, NULL);
+
+   if (!prop_ret) {
+        ALOGI("bluetooth.hciattach value is %s", hciattach_value);
+
+        if (!strncasecmp(hciattach_value, "true", sizeof("true"))) {
+            ret = system("/etc/bluetooth/init.msm.bt.sh");
+            if (ret != 0) {
+               ALOGI("/etc/bluetooth/init.msm.bt.sh returned with error value: %d", ret);
+               property_set("bluetooth.status", "off");
+               return -1;
+            }
+            ALOGI("/etc/bluetooth/init.msm.bt.sh executed successfully");
+            property_set("bluetooth.status", "on");
+        }
+        else if (!strncasecmp(hciattach_value, "false", sizeof("false"))) {
+           if (property_set("bluetooth.status", "off") < 0) {
+               ALOGI("Failed to set bluetooth.status to off");
+               return -1;
+           }
+        }
+    }
+    else {
+        ALOGE("Failed to get bluetooth.hciattach");
+        return -1;
+    }
+    return 0;
+}
+#endif
 
 /** Requested operations */
 static int op(bt_vendor_opcode_t opcode, void *param)
@@ -730,6 +765,11 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                            hw_config(BT_VND_PWR_OFF);
                         }
                         retval = hw_config(nState);
+#ifndef ANDROID
+                        if (bt_onoff_script() < 0)
+                            retval = -1;
+#endif
+
                         if(nState == BT_VND_PWR_ON
                            && retval == 0
                            && is_hw_ready() == TRUE){
