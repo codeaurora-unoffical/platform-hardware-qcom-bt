@@ -9,7 +9,6 @@ AM_CFLAGS = -Wall \
 
 AM_CPPFLAGS = -Iinclude \
         -I${WORKSPACE}/system/bt/hci/include \
-        -I${D}${includedir} \
         -DBT_NV_SUPPORT
 
 c_sources = \
