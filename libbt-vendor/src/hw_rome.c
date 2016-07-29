@@ -149,8 +149,8 @@ int get_vs_hci_event(unsigned char *rsp)
         err = -EIO;
         goto failed;
     }
-
-    ALOGI("%s: Parameter Length: 0x%x", __FUNCTION__, paramlen = rsp[EVT_PLEN]);
+    paramlen = rsp[EVT_PLEN];
+    ALOGI("%s: Parameter Length: 0x%x", __FUNCTION__, rsp[EVT_PLEN]);
     ALOGI("%s: Command response: 0x%x", __FUNCTION__, rsp[CMD_RSP_OFFSET]);
     ALOGI("%s: Response type   : 0x%x", __FUNCTION__, rsp[RSP_TYPE_OFFSET]);
 
@@ -896,9 +896,10 @@ int rome_get_tlv_file(char *file_path)
     } else if(ptlv_header->tlv_type == TLV_TYPE_NVM) {
         ALOGI("====================================================");
         ALOGI("TLV Type\t\t\t : 0x%x", ptlv_header->tlv_type);
-        ALOGI("Length\t\t\t : %d bytes",  nvm_length = (ptlv_header->tlv_length1) |
-                                                    (ptlv_header->tlv_length2 << 8) |
-                                                    (ptlv_header->tlv_length3 << 16));
+        nvm_length = ((ptlv_header->tlv_length1) |
+                     (ptlv_header->tlv_length2 << 8) |
+                     (ptlv_header->tlv_length3 << 16));
+        ALOGI("Length\t\t\t : %d bytes", nvm_length);
 
         if(nvm_length <= 0)
             return readSize;
@@ -907,7 +908,8 @@ int rome_get_tlv_file(char *file_path)
              nvm_index < nvm_length ; nvm_ptr = (tlv_nvm_hdr *) nvm_byte_ptr)
        {
             ALOGI("TAG ID\t\t\t : %d", nvm_ptr->tag_id);
-            ALOGI("TAG Length\t\t\t : %d", nvm_tag_len = nvm_ptr->tag_len);
+            nvm_tag_len = nvm_ptr->tag_len;
+            ALOGI("TAG Length\t\t\t : %d", nvm_tag_len);
             ALOGI("TAG Pointer\t\t\t : %d", nvm_ptr->tag_ptr);
             ALOGI("TAG Extended Flag\t\t : %d", nvm_ptr->tag_ex_flag);
 
