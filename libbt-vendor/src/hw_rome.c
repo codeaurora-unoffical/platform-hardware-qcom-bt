@@ -291,7 +291,7 @@ int get_vs_hci_event(unsigned char *rsp)
             if ((rsp[4] & ADDON_FEATURES_EVT_WIPOWER_MASK))
             {
                ALOGD("%s: WiPower feature supported!!", __FUNCTION__);
-               property_set("persist.bluetooth.a4wp", "true");
+               property_set_bt("persist.bluetooth.a4wp", "true");
             }
             break;
         case HCI_VS_STRAY_EVT:
@@ -1758,7 +1758,7 @@ void enable_controller_log (int fd, unsigned char wait_for_evt)
    unsigned char rsp[HCI_MAX_EVENT_SIZE];
    char value[PROPERTY_VALUE_MAX] = {'\0'};
 
-   property_get("persist.service.bdroid.soclog", value, "false");
+   property_get_bt("persist.service.bdroid.soclog", value, "false");
 
    // value at cmd[5]: 1 - to enable, 0 - to disable
    ret = (strcmp(value, "true") == 0) ? cmd[5] = 0x01: 0;

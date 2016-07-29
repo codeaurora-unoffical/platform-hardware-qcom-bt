@@ -24,8 +24,8 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <syslog.h>
-#define property_get prop_get
-#define property_set prop_set
+#define property_get_bt prop_get
+#define property_set_bt prop_set
 
 #define LOG_TAG "libbt-vendor : "
 

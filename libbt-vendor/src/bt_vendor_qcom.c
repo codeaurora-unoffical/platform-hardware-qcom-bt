@@ -205,7 +205,7 @@ int bt_wait_for_service_done(void)
 
     /* wait for service done */
     while (count-- > 0) {
-        property_get(WIFI_SERVICE_PROP, service_status, NULL);
+        property_get_bt(WIFI_SERVICE_PROP, service_status, NULL);
 
         if (strcmp(service_status, "") != 0) {
             usleep(200000);
@@ -227,7 +227,7 @@ static int get_bt_soc_type()
 
     ALOGI("bt-vendor : get_bt_soc_type");
 
-    ret = property_get("qcom.bluetooth.soc", bt_soc_type, NULL);
+    ret = property_get_bt("qcom.bluetooth.soc", bt_soc_type, NULL);
     if (!ret) {
         ALOGE("qcom.bluetooth.soc set to %s\n", bt_soc_type);
         if (!strncasecmp(bt_soc_type, "rome", sizeof("rome"))) {
@@ -255,7 +255,7 @@ bool can_perform_action(char action) {
     char inProgress[PROPERTY_VALUE_MAX] = {'\0'};
     int value, ret;
 
-    property_get("wc_transport.ref_count", ref_count, "0");
+    property_get_bt("wc_transport.ref_count", ref_count, "0");
 
     value = atoi(ref_count);
     ALOGV("%s: ref_count: %s\n",__func__,  ref_count);
@@ -264,7 +264,7 @@ bool can_perform_action(char action) {
         ALOGV("%s: on : value is: %d", __func__, value);
         if(value == 1)
         {
-          property_get("wc_transport.patch_dnld_inprog", inProgress, "null");
+          property_get_bt("wc_transport.patch_dnld_inprog", inProgress, "null");
           if((is_soc_initialized() == true) || (strcmp(inProgress,"null") != 0))
           {
             value++;
@@ -293,7 +293,7 @@ bool can_perform_action(char action) {
     snprintf(ref_count, 3, "%d", value);
     ALOGV("%s: updated ref_count is: %s", __func__, ref_count);
 
-    ret  = property_set("wc_transport.ref_count", ref_count);
+    ret  = property_set_bt("wc_transport.ref_count", ref_count);
     if (ret < 0) {
         ALOGE("%s: Error while updating property: %d\n", __func__, ret);
         return false;
@@ -306,15 +306,15 @@ void stop_hci_filter() {
        char value[PROPERTY_VALUE_MAX] = {'\0'};
        ALOGV("%s: Entry ", __func__);
 
-       property_get(BT_VND_FILTER_START, value, "false");
+       property_get_bt(BT_VND_FILTER_START, value, "false");
 
        if (strcmp(value, "false") == 0) {
            ALOGI("%s: hci_filter has been stopped already", __func__);
 //           return;
        }
 
-       property_set(BT_VND_FILTER_START, "false");
-       property_set("wc_transport.hci_filter_status", "0");
+       property_set_bt(BT_VND_FILTER_START, "false");
+       property_set_bt("wc_transport.hci_filter_status", "0");
        ALOGV("%s: Exit ", __func__);
 }
 
@@ -323,21 +323,21 @@ void start_hci_filter() {
        int i, init_success = 0;
        char value[PROPERTY_VALUE_MAX] = {'\0'};
 
-       property_get(BT_VND_FILTER_START, value, false);
+       property_get_bt(BT_VND_FILTER_START, value, false);
 
        if (strcmp(value, "true") == 0) {
            ALOGI("%s: hci_filter has been started already", __func__);
            return;
        }
 
-       property_set("wc_transport.hci_filter_status", "0");
-       property_set(BT_VND_FILTER_START, "true");
+       property_set_bt("wc_transport.hci_filter_status", "0");
+       property_set_bt(BT_VND_FILTER_START, "true");
 
        ALOGV("%s: %s set to true ", __func__, BT_VND_FILTER_START );
 
        //sched_yield();
        for(i=0; i<45; i++) {
-          property_get("wc_transport.hci_filter_status", value, "0");
+          property_get_bt("wc_transport.hci_filter_status", value, "0");
           if (strcmp(value, "1") == 0) {
              init_success = 1;
              break;
@@ -370,7 +370,7 @@ static int bt_powerup(int en )
 
 #ifdef ANDROID
     /* Check if rfkill has been disabled */
-    ret = property_get("ro.rfkilldisabled", disable, "0");
+    ret = property_get_bt("ro.rfkilldisabled", disable, "0");
     if (!ret ){
         ALOGE("Couldn't get ro.rfkilldisabled (%d)", ret);
         return -1;
@@ -479,12 +479,12 @@ static int bt_powerup(int en )
     if(on == '0'){
         ALOGE("Stopping HCI filter as part of CTRL:OFF");
         stop_hci_filter();
-        property_set("wc_transport.soc_initialized", "0");
+        property_set_bt("wc_transport.soc_initialized", "0");
     }
 #endif
 #ifdef WIFI_BT_STATUS_SYNC
     /* query wifi status */
-    property_get(WIFI_PROP_NAME, wifi_status, "");
+    property_get_bt(WIFI_PROP_NAME, wifi_status, "");
 
     ALOGE("bt get wifi status: %s, isInit: %d\n",  wifi_status, isInit);
 
@@ -492,7 +492,7 @@ static int bt_powerup(int en )
     if (strncmp(wifi_status, "unloaded", strlen("unloaded")) == 0 || strlen(wifi_status) == 0) {
         if (on == '1') {
             ALOGI("%s: BT_VND_PWR_ON\n", __func__);
-            if(property_set(SERVICE_PROP_NAME, "load_wlan") < 0) {
+            if(property_set_bt(SERVICE_PROP_NAME, "load_wlan") < 0) {
                 ALOGE("%s Property setting failed", SERVICE_PROP_NAME);
                 close(fd);
                 bt_semaphore_release(lock_fd);
@@ -502,7 +502,7 @@ static int bt_powerup(int en )
         }
         else if (isInit == 0 && on == '0') {
             ALOGI("%s: BT_VND_PWR_OFF\n", __func__);
-            if(property_set(SERVICE_PROP_NAME, "unbind_hsic") < 0) {
+            if(property_set_bt(SERVICE_PROP_NAME, "unbind_hsic") < 0) {
                 ALOGE("%s Property setting failed", SERVICE_PROP_NAME);
                 close(fd);
                 bt_semaphore_release(lock_fd);
@@ -513,9 +513,9 @@ static int bt_powerup(int en )
     }
 
     if (isInit == 0 && on == '0')
-        property_set(BT_STATUS_NAME, "false");
+        property_set_bt(BT_STATUS_NAME, "false");
     else if (on == '1')
-        property_set(BT_STATUS_NAME, "true");
+        property_set_bt(BT_STATUS_NAME, "true");
 
     bt_semaphore_release(lock_fd);
     bt_semaphore_destroy(lock_fd);
@@ -565,7 +565,7 @@ static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
         exit(1);
     }
 #if (BT_SOC_TYPE_ROME ||BT_SOC_TYPE_CHEROKEE)
-    property_set("qcom.bluetooth.soc", "rome");
+    property_set_bt("qcom.bluetooth.soc", "rome");
 #endif
 #endif
 
@@ -677,7 +677,7 @@ bool is_soc_initialized() {
 
     ALOGI("bt-vendor : is_soc_initialized");
 
-    ret = property_get("wc_transport.soc_initialized", init_value, NULL);
+    ret = property_get_bt("wc_transport.soc_initialized", init_value, NULL);
     if (!ret) {
         ALOGI("wc_transport.soc_initialized set to %s\n", init_value);
         if (!strncasecmp(init_value, "1", sizeof("1"))) {
@@ -691,6 +691,41 @@ bool is_soc_initialized() {
     return init;
 }
 
+#ifndef ANDROID
+int bt_onoff_script(void)
+{
+   int prop_ret = 0;
+   int ret = -1;
+   char hciattach_value[PROPERTY_VALUE_MAX];
+   prop_ret = property_get_bt("bluetooth.hciattach", hciattach_value, NULL);
+
+   if (!prop_ret) {
+        ALOGI("bluetooth.hciattach value is %s", hciattach_value);
+
+        if (!strncasecmp(hciattach_value, "true", sizeof("true"))) {
+            ret = system("/etc/bluetooth/init.msm.bt.sh");
+            if (ret != 0) {
+               ALOGI("/etc/bluetooth/init.msm.bt.sh returned with error value: %d", ret);
+               property_set_bt("bluetooth.status", "off");
+               return -1;
+            }
+            ALOGI("/etc/bluetooth/init.msm.bt.sh executed successfully");
+            property_set_bt("bluetooth.status", "on");
+        }
+        else if (!strncasecmp(hciattach_value, "false", sizeof("false"))) {
+           if (property_set_bt("bluetooth.status", "off") < 0) {
+               ALOGI("Failed to set bluetooth.status to off");
+               return -1;
+           }
+        }
+    }
+    else {
+        ALOGE("Failed to get bluetooth.hciattach");
+        return -1;
+    }
+    return 0;
+}
+#endif
 
 /** Requested operations */
 static int op(bt_vendor_opcode_t opcode, void *param)
@@ -730,6 +765,11 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                            hw_config(BT_VND_PWR_OFF);
                         }
                         retval = hw_config(nState);
+#ifndef ANDROID
+                        if (bt_onoff_script() < 0)
+                            retval = -1;
+#endif
+
                         if(nState == BT_VND_PWR_ON
                            && retval == 0
                            && is_hw_ready() == TRUE){
@@ -837,10 +877,10 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     case BT_SOC_ROME:
                         {
                             wait_for_patch_download(is_ant_req);
-                            property_get("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
+                            property_get_bt("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
                             if (!is_soc_initialized()) {
                                 char* dlnd_inprog = is_ant_req ? "ant" : "bt";
-                                if (property_set("wc_transport.patch_dnld_inprog", dlnd_inprog) < 0) {
+                                if (property_set_bt("wc_transport.patch_dnld_inprog", dlnd_inprog) < 0) {
                                     ALOGE("%s: Failed to set dnld_inprog %s", __FUNCTION__, dlnd_inprog);
                                 }
 
@@ -853,7 +893,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                     userial_clock_operation(fd, USERIAL_OP_CLK_ON);
                                     ALOGD("userial clock on");
                                     if(strcmp(emb_wp_mode, "true") == 0) {
-                                        property_get("ro.bluetooth.wipower", wipower_status, false);
+                                        property_get_bt("ro.bluetooth.wipower", wipower_status, false);
                                         if(strcmp(wipower_status, "true") == 0) {
                                             check_embedded_mode(fd);
                                         } else {
@@ -861,11 +901,11 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                         }
                                     }
                                     ALOGV("rome_soc_init is started");
-                                    property_set("wc_transport.soc_initialized", "0");
+                                    property_set_bt("wc_transport.soc_initialized", "0");
 #ifdef READ_BT_ADDR_FROM_PROP
                                     /*Give priority to read BD address from boot property*/
                                     ignore_boot_prop = FALSE;
-                                    if (property_get(BLUETOOTH_MAC_ADDR_BOOT_PROPERTY, bd_addr, NULL)) {
+                                    if (property_get_bt(BLUETOOTH_MAC_ADDR_BOOT_PROPERTY, bd_addr, NULL)) {
                                         ALOGV("BD address read from Boot property: %s\n", bd_addr);
                                         tok =  strtok(bd_addr, ":");
                                         while (tok != NULL) {
@@ -909,16 +949,16 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                                         retval = -1;
                                     } else {
                                         ALOGV("rome_soc_init is completed");
-                                        property_set("wc_transport.soc_initialized", "1");
+                                        property_set_bt("wc_transport.soc_initialized", "1");
                                         skip_init = false;
                                     }
                                 }
                             }
-                            if (property_set("wc_transport.patch_dnld_inprog", "null") < 0) {
+                            if (property_set_bt("wc_transport.patch_dnld_inprog", "null") < 0) {
                                 ALOGE("%s: Failed to set property", __FUNCTION__);
                             }
 
-                            property_set("wc_transport.clean_up","0");
+                            property_set_bt("wc_transport.clean_up","0");
 
                             if (retval != -1) {
 #if (BT_SOC_TYPE_ROME ||BT_SOC_TYPE_CHEROKEE)
@@ -979,7 +1019,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
         case BT_VND_OP_ANT_USERIAL_CLOSE:
             {
                 ALOGI("bt-vendor : BT_VND_OP_ANT_USERIAL_CLOSE");
-                property_set("wc_transport.clean_up","1");
+                property_set_bt("wc_transport.clean_up","1");
                 if (ant_fd != -1) {
                     ALOGE("closing ant_fd");
                     close(ant_fd);
@@ -1000,7 +1040,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
 
                      case BT_SOC_ROME:
                      case BT_SOC_AR3K:
-                        property_set("wc_transport.clean_up","1");
+                        property_set_bt("wc_transport.clean_up","1");
                         userial_vendor_close();
                         break;
                     default:
@@ -1089,7 +1129,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                   case BT_SOC_ROME:
                        {
                            char value[PROPERTY_VALUE_MAX] = {'\0'};
-                           property_get("wc_transport.hci_filter_status", value, "0");
+                           property_get_bt("wc_transport.hci_filter_status", value, "0");
                            if(is_soc_initialized()&& (strcmp(value,"1") == 0))
                            {
                               hw_epilog_process();
@@ -1140,7 +1180,7 @@ static void ssr_cleanup(int reason) {
     int ret;
     unsigned char trig_ssr = 0xEE;
     ALOGI("ssr_cleanup");
-    if (property_set("wc_transport.patch_dnld_inprog", "null") < 0) {
+    if (property_set_bt("wc_transport.patch_dnld_inprog", "null") < 0) {
         ALOGE("%s: Failed to set property", __FUNCTION__);
     }
 
@@ -1208,7 +1248,7 @@ void wait_for_patch_download(bool is_ant_req) {
     ALOGV("%s:", __FUNCTION__);
     char inProgress[PROPERTY_VALUE_MAX] = {'\0'};
     while (1) {
-        property_get("wc_transport.patch_dnld_inprog", inProgress, "null");
+        property_get_bt("wc_transport.patch_dnld_inprog", inProgress, "null");
 
         if(is_ant_req && !strcmp(inProgress,"bt") ) {
            //ANT request, wait for BT to finish
@@ -1230,7 +1270,7 @@ static bool is_debug_force_special_bytes() {
     char value[PROPERTY_VALUE_MAX] = {'\0'};
     bool enabled = false;
 
-    ret = property_get("wc_transport.force_special_byte", value, NULL);
+    ret = property_get_bt("wc_transport.force_special_byte", value, NULL);
 
     if (ret) {
         enabled = (strcmp(value, "false") ==0) ? false : true;
@@ -1251,7 +1291,7 @@ const bt_vendor_interface_t BLUETOOTH_VENDOR_LIB_INTERFACE = {
 };
 
 #ifndef ANDROID
-int property_get(const char *key, char *value, const char *default_value)
+int property_get_bt(const char *key, char *value, const char *default_value)
 {
     char prop_string[200];
     int ret, bytes_read = 0, i = 0;
@@ -1271,7 +1311,7 @@ int property_get(const char *key, char *value, const char *default_value)
             i++;
         }
     } while(1);
-    ALOGD("property_get: key(%s) has value: %s", key, value);
+    ALOGD("property_get_bt: key(%s) has value: %s", key, value);
     if (bytes_read) {
         return 0;
     } else {
@@ -1280,12 +1320,12 @@ int property_get(const char *key, char *value, const char *default_value)
     }
 }
 
-int property_set(const char *key, const char *value)
+int property_set_bt(const char *key, const char *value)
 {
     char prop_string[200];
     int ret;
     sprintf(prop_string, "set_property %s %s,", key, value);
-    ALOGD("property_set: setting key(%s) to value: %s\n", key, value);
+    ALOGD("property_set_bt: setting key(%s) to value: %s\n", key, value);
     ret = send(bt_prop_socket, prop_string, strlen(prop_string), 0);
     return 0;
 }
