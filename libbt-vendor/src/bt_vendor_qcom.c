@@ -556,7 +556,7 @@ static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
     /*Create the address of the server.*/
     memset(&name, 0, sizeof(struct sockaddr_un));
     name.sun_family = AF_UNIX;
-    strncpy(name.sun_path, SOCKETNAME, strlen(SOCKETNAME));
+    strlcpy(name.sun_path, SOCKETNAME, sizeof(name.sun_path));
     ALOGE("connecting to %s, fd = %d", SOCKETNAME, bt_prop_socket);
     len = sizeof(name.sun_family) + strlen(name.sun_path);
     /*Connect to the server.*/
