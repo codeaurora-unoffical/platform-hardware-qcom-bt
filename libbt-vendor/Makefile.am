@@ -11,6 +11,16 @@ AM_CPPFLAGS = -Iinclude \
         -I${WORKSPACE}/system/bt/hci/include \
         -DBT_NV_SUPPORT
 
+if MDM_ROME
+AM_CFLAGS += -DBT_SOC_TYPE_ROME
+AM_CPPFLAGS += -DBT_SOC_TYPE_ROME
+else
+if MDM_PRONTO
+AM_CFLAGS += -DHCI_USE_MCT
+AM_CPPFLAGS += -DHCI_USE_MCT
+endif
+endif
+
 c_sources = \
         src/bt_vendor_qcom.c \
         src/hardware.c \
