@@ -20,6 +20,12 @@
 #include "bt_vendor_lib.h"
 //#include "vnd_buildcfg.h"
 
+
+#ifdef USE_GLIB
+#include <glib.h>
+#define strlcpy g_strlcpy
+#endif
+
 #ifndef ANDROID
 #include <stdio.h>
 #include <sys/ioctl.h>

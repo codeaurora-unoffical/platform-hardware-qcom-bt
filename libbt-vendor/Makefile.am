@@ -20,6 +20,14 @@ c_sources = \
         src/hw_ar3k.c \
         src/bt_vendor_persist.cpp
 
+if USE_GLIB
+ libbt_vendor_la_CFLAGS = $(AM_CFLAGS) -fPIC -D_GNU_SOURCE -D__KERNEL__ -DUSE_GLIB @GLIB_CFLAGS@
+ libbt_vendor_la_LDFLAGS = -shared @GLIB_LIBS@
+else
+ libbt_vendor_la_CFLAGS = $(AM_CFLAGS) -fPIC -D_GNU_SOURCE -D__KERNEL__
+ libbt_vendor_la_LDFLAGS = -shared
+endif
+
 requiredlibs = -lpthread -lcutils $(SYS_LIB)/libbtnv.la
 library_includedir = $(pkgincludedir)\
 library_include_HEADERS = $(h_sources)
@@ -28,5 +36,3 @@ libbt_vendor_la_CC = @CC@
 libbt_vendor_la_SOURCES = $(c_sources)
 libbt_vendor_la_CPPFLAGS =$(AM_CPPFLAGS)
 libbt_vendor_la_LIBADD = $(requiredlibs)
-libbt_vendor_la_CFLAGS = $(AM_CFLAGS) -fPIC -D_GNU_SOURCE -D__KERNEL__
-libbt_vendor_la_LDFLAGS = -shared
