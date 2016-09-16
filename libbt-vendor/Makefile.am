@@ -28,7 +28,8 @@ else
  libbt_vendor_la_LDFLAGS = -shared
 endif
 
-requiredlibs = -lpthread -lcutils $(SYS_LIB)/libbtnv.la
+requiredlibs = -lpthread $(SYS_LIB)/libbtnv.la
+
 library_includedir = $(pkgincludedir)\
 library_include_HEADERS = $(h_sources)
 lib_LTLIBRARIES = libbt-vendor.la

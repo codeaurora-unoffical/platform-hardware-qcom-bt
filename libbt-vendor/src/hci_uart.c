@@ -448,7 +448,7 @@ int userial_set_port(char *p_conf_name, char *p_conf_value, int param)
 {
     RESERVED(p_conf_name);
     RESERVED(param);
-    strlcpy(vnd_userial.port_name, p_conf_value, VND_PORT_NAME_MAXLEN);
+    strncpy(vnd_userial.port_name, p_conf_value, VND_PORT_NAME_MAXLEN);
 
     return 0;
 }
