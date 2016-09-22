@@ -692,11 +692,20 @@ bool is_soc_initialized() {
 }
 
 #ifndef ANDROID
-int bt_onoff_script(void)
+static int bt_onoff_script(int n_state)
 {
    int prop_ret = 0;
    int ret = -1;
    char hciattach_value[PROPERTY_VALUE_MAX];
+
+   /* "bluetooth.status" and "bluetooth.hciattach" properties remain unchanged
+    * ("on" and "true" respectively) while bluetooth is turning off in Android.
+    * We preserved the same behavior in LE for compatibility and to avoid
+    * confusion.
+    */
+   if (n_state == BT_VND_PWR_OFF)
+        return 0;
+
    prop_ret = property_get_bt("bluetooth.hciattach", hciattach_value, NULL);
 
    if (!prop_ret) {
@@ -766,7 +775,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                         }
                         retval = hw_config(nState);
 #ifndef ANDROID
-                        if (bt_onoff_script() < 0)
+                        if (bt_onoff_script(nState) < 0)
                             retval = -1;
 #endif
 
