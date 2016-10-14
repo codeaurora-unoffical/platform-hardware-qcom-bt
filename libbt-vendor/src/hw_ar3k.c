@@ -540,12 +540,12 @@ static void update_tag_data(struct ps_cfg_entry *tag,
 
     buf[2] = '\0';
 
-    strlcpy(buf, &ptr[info->char_cnt],sizeof(buf));
+    strncpy(buf, &ptr[info->char_cnt],sizeof(buf));
     tag->data[info->byte_count] = strtol(buf, NULL, 16);
     info->char_cnt += 3;
     info->byte_count++;
 
-    strlcpy(buf, &ptr[info->char_cnt], sizeof(buf));
+    strncpy(buf, &ptr[info->char_cnt], sizeof(buf));
     tag->data[info->byte_count] = strtol(buf, NULL, 16);
     info->char_cnt += 3;
     info->byte_count++;
@@ -925,7 +925,7 @@ static int ps_patch_download(int fd, FILE *stream)
         if (strlen(ptr) <= 1)
             continue;
         else if (strstr(ptr, PATCH_LOC_KEY) == ptr) {
-            strlcpy(patch_loc, &ptr[sizeof(PATCH_LOC_KEY) - 1],
+            strncpy(patch_loc, &ptr[sizeof(PATCH_LOC_KEY) - 1],
                 PATCH_LOC_STRING_LEN);
             if (set_patch_ram(fd, patch_loc, sizeof(patch_loc)) < 0)
                 return -1;
