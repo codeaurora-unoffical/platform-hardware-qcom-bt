@@ -201,37 +201,30 @@ int bt_wait_for_service_done(void)
 
 #endif /* WIFI_BT_STATUS_SYNC */
 
-/** Get Bluetooth SoC type from system setting */
-static int get_bt_soc_type()
-{
-    int ret = 0;
-    char bt_soc_type[PROPERTY_VALUE_MAX];
+bt_soc_list btsoc_list[] ={
+        {BT_SOC_AR3K, "ath3k", sizeof("ath3k")},
+        {BT_SOC_ROME, "rome", sizeof("rome")},
+        {BT_SOC_CHEROKEE, "cherokee", sizeof("cherokee")},
+        {BT_SOC_NAPIER, "napier", sizeof("napier")},
+        {BT_SOC_RESERVED, "", 0},
+};
 
-    ALOGI("bt-vendor : get_bt_soc_type");
+/** Get Bluetooth SoC type from system setting */
+int get_bt_soc_type()
+{
+    int ret = 0, i;
+    char bt_soc_type[PROPERTY_VALUE_MAX];
 
     ret = property_get("qcom.bluetooth.soc", bt_soc_type, NULL);
     if (ret != 0) {
         ALOGI("qcom.bluetooth.soc set to %s\n", bt_soc_type);
-        if (!strncasecmp(bt_soc_type, "rome", sizeof("rome"))) {
-            return BT_SOC_ROME;
-        }
-        else if (!strncasecmp(bt_soc_type, "ath3k", sizeof("ath3k"))) {
-            return BT_SOC_AR3K;
-        }
-        else if (!strncasecmp(bt_soc_type, "cherokee", sizeof("cherokee"))) {
-            return BT_SOC_CHEROKEE;
-        }
-        else {
-            ALOGI("qcom.bluetooth.soc not set, so using default.\n");
-            return BT_SOC_DEFAULT;
+        for(i=0; btsoc_list[i].soc_type != BT_SOC_RESERVED ;i++) {
+            if(!strncasecmp(bt_soc_type, btsoc_list[i].soc_name, btsoc_list[i].soc_size))
+                return btsoc_list[i].soc_type;
         }
     }
-    else {
-        ALOGE("%s: Failed to get soc type", __FUNCTION__);
-        ret = BT_SOC_DEFAULT;
-    }
-
-    return ret;
+    ALOGI("%s: qcom.bluetooth.soc not set, set to default", __FUNCTION__);
+    return BT_SOC_DEFAULT;
 }
 
 bool can_perform_action(char action) {
@@ -301,7 +294,7 @@ void stop_hci_filter() {
            ALOGI("%s: hci_filter has been stopped already", __func__);
 //           return;
        }
-       if ((soc_type = get_bt_soc_type()) == BT_SOC_CHEROKEE) {
+       if (btSocType == BT_SOC_CHEROKEE) {
            filter_ctrl = connect_to_local_socket("wcnssfilter_ctrl");
            if (filter_ctrl < 0) {
                ALOGI("%s: Error while connecting to CTRL_SOCK, filter should stopped: %d", __func__, filter_ctrl);
@@ -336,7 +329,8 @@ void stop_hci_filter() {
             both of these ensure clean shutdown of chip
            */
            //property_set(BT_VND_FILTER_START, "false");
-       } else if (soc_type == BT_SOC_ROME) {
+       }
+       else if ((btSocType == BT_SOC_ROME) ||(btSocType == BT_SOC_NAPIER)) {
            property_set(BT_VND_FILTER_START, "false");
        } else {
            ALOGI("%s: Unknown soc type %d, Unexpected!", __func__, soc_type);
@@ -585,6 +579,7 @@ static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
         case BT_SOC_ROME:
         case BT_SOC_AR3K:
         case BT_SOC_CHEROKEE:
+        case BT_SOC_NAPIER:
             ALOGI("bt-vendor : check soc initialized ");
             if (!is_soc_initialized()) {
                 ALOGI("bt-vendor : Initializing UART transport layer");
@@ -761,6 +756,7 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                     case BT_SOC_ROME:
                     case BT_SOC_AR3K:
                     case BT_SOC_CHEROKEE:
+                    case BT_SOC_NAPIER:
                         /* BT Chipset Power Control through Device Tree Node */
                         retval = bt_powerup(nState);
                     default:
@@ -1001,6 +997,7 @@ userial_open:
                         }
                         break;
                     case BT_SOC_CHEROKEE:
+                    case BT_SOC_NAPIER:
                         {
 
                             property_get("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
@@ -1096,6 +1093,7 @@ userial_open:
                     case BT_SOC_ROME:
                     case BT_SOC_AR3K:
                     case BT_SOC_CHEROKEE:
+                    case BT_SOC_NAPIER:
                     {
                         property_set("wc_transport.clean_up","1");
                         userial_vendor_close();
@@ -1342,6 +1340,9 @@ bool is_download_progress () {
             break;
         case BT_SOC_CHEROKEE:
             ALOGI("%s: CHEROKEE case", __func__);
+            break;
+        case BT_SOC_NAPIER:
+            ALOGI("%s: NAPIER case", __func__);
             break;
         case BT_SOC_DEFAULT:
             break;

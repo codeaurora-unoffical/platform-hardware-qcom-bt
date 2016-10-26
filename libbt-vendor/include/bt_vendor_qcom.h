@@ -33,15 +33,30 @@
 #define UINT16_TO_STREAM(p, u16) {*(p)++ = (uint8_t)(u16); *(p)++ = (uint8_t)((u16) >> 8);}
 #define UINT32_TO_STREAM(p, u32) {*(p)++ = (uint8_t)(u32); *(p)++ = (uint8_t)((u32) >> 8); *(p)++ = (uint8_t)((u32) >> 16); *(p)++ = (uint8_t)((u32) >> 24);}
 
+/** bluetooth soc chipset list  */
 typedef enum {
     BT_SOC_DEFAULT = 0,
     BT_SOC_SMD = BT_SOC_DEFAULT,
     BT_SOC_AR3K,
     BT_SOC_ROME,
     BT_SOC_CHEROKEE,
+    BT_SOC_NAPIER,
     /* Add chipset type here */
     BT_SOC_RESERVED
 }bt_soc_type;
+
+/** bluetooth soc chipset data structure  */
+typedef struct {
+    int soc_type;
+    char *soc_name;
+    int soc_size;
+} bt_soc_list;
+
+/** bluetooth soc chipset list with data structure */
+extern bt_soc_list btsoc_list[];
+
+/** get bt soc type based on property define in system */
+int get_bt_soc_type();
 
 typedef enum {
     BT_VND_OP_ANT_USERIAL_OPEN = 254,
