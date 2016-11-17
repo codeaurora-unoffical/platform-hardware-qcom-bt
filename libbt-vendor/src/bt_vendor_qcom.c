@@ -232,6 +232,7 @@ bool can_perform_action(char action) {
     char ref_count[PROPERTY_VALUE_MAX];
     char inProgress[PROPERTY_VALUE_MAX] = {'\0'};
     int value, ret;
+    int bt_soc_type = get_bt_soc_type();
 
     property_get("wc_transport.ref_count", ref_count, "0");
 
@@ -242,8 +243,8 @@ bool can_perform_action(char action) {
         ALOGV("%s: on : value is: %d", __func__, value);
         if(value == 1)
         {
-          property_get("wc_transport.patch_dnld_inprog", inProgress, "null");
-          if((is_soc_initialized() == true) || (strcmp(inProgress,"null") != 0))
+          if((is_soc_initialized() == true) || is_download_progress()
+              ||  bt_soc_type == BT_SOC_CHEROKEE || bt_soc_type == BT_SOC_NAPIER)
           {
             value++;
             ALOGV("%s: on : value is incremented to : %d", __func__, value);
