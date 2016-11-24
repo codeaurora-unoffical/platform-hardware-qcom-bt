@@ -446,10 +446,14 @@ int userial_vendor_ioctl(userial_vendor_ioctl_op_t op, int *p_data)
 *******************************************************************************/
 int userial_set_port(char *p_conf_name, char *p_conf_value, int param)
 {
+    int len;
     RESERVED(p_conf_name);
     RESERVED(param);
-    strncpy(vnd_userial.port_name, p_conf_value, VND_PORT_NAME_MAXLEN);
-
+    len = strlcpy(vnd_userial.port_name, p_conf_value, VND_PORT_NAME_MAXLEN);
+    if (len >= VND_PORT_NAME_MAXLEN) {
+        ALOGE("source string is too long\n");
+        return -1;
+    }
     return 0;
 }
 

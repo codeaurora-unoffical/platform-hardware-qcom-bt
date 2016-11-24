@@ -537,15 +537,25 @@ static void update_tag_data(struct ps_cfg_entry *tag,
     struct tag_info *info, const char *ptr)
 {
     char buf[3];
+    int len;
 
     buf[2] = '\0';
 
-    strncpy(buf, &ptr[info->char_cnt],sizeof(buf));
+    len = strlcpy(buf, &ptr[info->char_cnt],sizeof(buf));
+    if (len >= sizeof(buf)) {
+        ALOGE("source string is too long\n");
+        return -1;
+    }
+
     tag->data[info->byte_count] = strtol(buf, NULL, 16);
     info->char_cnt += 3;
     info->byte_count++;
 
-    strncpy(buf, &ptr[info->char_cnt], sizeof(buf));
+    len = strlcpy(buf, &ptr[info->char_cnt], sizeof(buf));
+    if (len >= sizeof(buf)) {
+        ALOGE("source string is too long\n");
+        return -1;
+    }
     tag->data[info->byte_count] = strtol(buf, NULL, 16);
     info->char_cnt += 3;
     info->byte_count++;
@@ -918,6 +928,7 @@ static int ps_patch_download(int fd, FILE *stream)
     int byte_cnt;
     int patch_count = 0;
     char patch_loc[PATCH_LOC_STRING_LEN + 1];
+    int len;
 
     byte[2] = '\0';
 
@@ -925,8 +936,13 @@ static int ps_patch_download(int fd, FILE *stream)
         if (strlen(ptr) <= 1)
             continue;
         else if (strstr(ptr, PATCH_LOC_KEY) == ptr) {
-            strncpy(patch_loc, &ptr[sizeof(PATCH_LOC_KEY) - 1],
-                PATCH_LOC_STRING_LEN);
+            len = strlcpy(patch_loc, &ptr[sizeof(PATCH_LOC_KEY) - 1],
+                sizeof(patch_loc));
+            if (len >= sizeof(patch_loc)) {
+                 ALOGE("source string is too long\n");
+                 return -1;
+            }
+
             if (set_patch_ram(fd, patch_loc, sizeof(patch_loc)) < 0)
                 return -1;
         } else if (isxdigit(ptr[0]))
