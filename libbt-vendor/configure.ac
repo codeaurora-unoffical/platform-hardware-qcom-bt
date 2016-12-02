@@ -63,6 +63,13 @@ AC_ARG_ENABLE(target,
 AM_CONDITIONAL([MDM_ROME], [test "x$TARGET" = "xmdm9607" -o "x$TARGET" = "xmdm9635" -o "x$TARGET" = "xmdm9640" -o "x$TARGET" = "xmdmcalifornium" -o "x$TARGET" = "xapq8096" -o "x$TARGET" = "xsdxhedgehog"])
 AM_CONDITIONAL([MDM_PRONTO], [test "x$TARGET" = "xapq8009" -o "x$TARGET" = "xapq8017" -o "x$TARGET" = "xapq8053" -o "x$TARGET" = "xapq8016"])
 
+AC_ARG_ENABLE(rome,
+  [AS_HELP_STRING([--enable-rome=ROME], [Specify the rome product to build])],
+  [ROME=$enableval],
+  [ROME=none]
+)
+AM_CONDITIONAL([MDM_ROME], [test "x$ROME" = "xsnap"])
+
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/socket.h sys/time.h termios.h unistd.h])
 
