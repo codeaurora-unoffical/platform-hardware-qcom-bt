@@ -67,9 +67,9 @@
 #define ANT_SOCK "ant_sock"
 #define BT_SOCK "bt_sock"
 #else
-#define ANT_SOCK "/etc/bluetooth/ant_sock"
-#define BT_SOCK "/etc/bluetooth/bt_sock"
-#define SOCKETNAME  "/etc/bluetooth/btprop"
+#define ANT_SOCK "/data/misc/bluetooth/ant_sock"
+#define BT_SOCK "/data/misc/bluetooth/bt_sock"
+#define SOCKETNAME  "/data/misc/bluetooth/btprop"
 #endif
 
 static void wait_for_patch_download(bool is_ant_req);
@@ -712,13 +712,14 @@ static int bt_onoff_script(int n_state)
         ALOGI("bluetooth.hciattach value is %s", hciattach_value);
 
         if (!strncasecmp(hciattach_value, "true", sizeof("true"))) {
-            ret = system("/etc/bluetooth/init.msm.bt.sh");
+            ret = system("/bin/sh /data/misc/bluetooth/init.msm.bt.sh");
+
             if (ret != 0) {
-               ALOGI("/etc/bluetooth/init.msm.bt.sh returned with error value: %d", ret);
+               ALOGI("/data/misc/bluetooth/init.msm.bt.sh returned with error value: %d", ret);
                property_set_bt("bluetooth.status", "off");
                return -1;
             }
-            ALOGI("/etc/bluetooth/init.msm.bt.sh executed successfully");
+            ALOGI("/data/misc/bluetooth/init.msm.bt.sh executed successfully");
             property_set_bt("bluetooth.status", "on");
         }
         else if (!strncasecmp(hciattach_value, "false", sizeof("false"))) {
