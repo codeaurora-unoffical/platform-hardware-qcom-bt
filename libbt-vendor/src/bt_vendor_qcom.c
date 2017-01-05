@@ -98,7 +98,7 @@ extern int chipset_ver;
 /******************************************************************************
 **  Variables
 ******************************************************************************/
-struct bt_qcom_struct *q = NULL;
+struct bt_qcom_struct q;
 pthread_mutex_t q_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifndef ANDROID
@@ -311,6 +311,40 @@ bool can_perform_action(char action) {
     return can_perform;
 }
 
+void kill_hci_filter() {
+    char value[PROPERTY_VALUE_MAX] = {'\0'};
+    char ref_count[PROPERTY_VALUE_MAX];
+    int count, ret;
+
+    property_get_bt("wc_transport.ref_count", ref_count, "0");
+    count = atoi(ref_count);
+    if (count > 0) {
+        ALOGI("%s: there are active clients, not killing", __func__);
+        return;
+    }
+
+    property_get_bt(BT_VND_FILTER_START, value, "false");
+    if (strcmp(value, "true") == 0) {
+        ALOGE("%s: hci_filter is still running, killing it", __func__);
+        /* Setting properties to correct values */
+        ret = property_set_bt("wc_transport.hci_filter_status", "0");
+        if (ret < 0)
+            ALOGE("%s: Error while updating hci_filter_status property: %d\n", __func__, ret);
+
+        ret = property_set_bt("wc_transport.ref_count", "0");
+        if (ret < 0)
+            ALOGE("%s: Error while updating ref_count property: %d\n", __func__, ret);
+
+        ret = property_set_bt(BT_VND_FILTER_START, "false");
+        if (ret < 0)
+            ALOGE("%s: Error while updating start_hci property: %d\n", __func__, ret);
+        else {
+            ALOGI("%s: WCNSS_FILTER stopped", __func__);
+            usleep(STOP_WAIT_TIMEOUT * 10);
+        }
+    }
+}
+
 void stop_hci_filter() {
        char value[PROPERTY_VALUE_MAX] = {'\0'};
        int retval, filter_ctrl, i;
@@ -319,56 +353,43 @@ void stop_hci_filter() {
 
        ALOGV("%s: Entry ", __func__);
 
-       if ((soc_type = get_bt_soc_type()) == BT_SOC_CHEROKEE) {
-           property_get_bt("wc_transport.hci_filter_status", value, "0");
-           if (strcmp(value, "0") == 0) {
-               ALOGI("%s: hci_filter has been stopped already", __func__);
+       property_get_bt("wc_transport.hci_filter_status", value, "0");
+       if (strcmp(value, "0") == 0) {
+           ALOGI("%s: hci_filter has been stopped already", __func__);
+       }
+       else {
+           filter_ctrl = connect_to_local_socket(CTRL_SOCK);
+           if (filter_ctrl < 0) {
+               ALOGI("%s: Error while connecting to CTRL_SOCK, filter should stopped: %d",
+                     __func__, filter_ctrl);
            }
            else {
-               filter_ctrl = connect_to_local_socket(CTRL_SOCK);
-               if (filter_ctrl < 0) {
-                   ALOGI("%s: Error while connecting to CTRL_SOCK, filter should stopped: %d",
-                          __func__, filter_ctrl);
+               retval = write(filter_ctrl, &stop_val, 1);
+               if (retval != 1) {
+                   ALOGI("%s: problem writing to CTRL_SOCK, ignore: %d", __func__, retval);
+                   //Ignore and fallback
                }
-               else {
-                   retval = write(filter_ctrl, &stop_val, 1);
-                   if (retval != 1) {
-                       ALOGI("%s: problem writing to CTRL_SOCK, ignore: %d", __func__, retval);
-                       //Ignore and fallback
-                   }
 
-                   close(filter_ctrl);
-               }
+               close(filter_ctrl);
            }
-
-           /* Ensure Filter is closed by checking the status before
-              RFKILL 0 operation. this should ideally comeout very
-              quick */
-           for(i=0; i<500; i++) {
-               property_get_bt(BT_VND_FILTER_START, value, "false");
-               if (strcmp(value, "false") == 0) {
-                   ALOGI("%s: WCNSS_FILTER stopped", __func__);
-                   usleep(STOP_WAIT_TIMEOUT * 10);
-                   break;
-               } else {
-                   /*sleep of 1ms, This should give enough time for FILTER to
-                   exit with all necessary cleanup*/
-                   usleep(STOP_WAIT_TIMEOUT);
-               }
-           }
-
-           /*Never use SIGKILL to stop the filter*/
-           /* Filter will be stopped by below two conditions
-            - by Itself, When it realizes there are no CONNECTED clients
-            - Or through STOP_WCNSS_FILTER byte on Control socket
-            both of these ensure clean shutdown of chip
-           */
-           //property_set(BT_VND_FILTER_START, "false");
-       } else if (soc_type == BT_SOC_ROME) {
-           property_set_bt(BT_VND_FILTER_START, "false");
-       } else {
-           ALOGI("%s: Unknown soc type %d, Unexpected!", __func__, soc_type);
        }
+
+       /* Ensure Filter is closed by checking the status before
+          RFKILL 0 operation. this should ideally comeout very
+          quick */
+       for(i=0; i<500; i++) {
+           property_get_bt(BT_VND_FILTER_START, value, "false");
+           if (strcmp(value, "false") == 0) {
+               ALOGI("%s: WCNSS_FILTER stopped", __func__);
+               usleep(STOP_WAIT_TIMEOUT * 10);
+               break;
+           } else {
+               /*sleep of 1ms, This should give enough time for FILTER to
+               exit with all necessary cleanup*/
+               usleep(STOP_WAIT_TIMEOUT);
+           }
+       }
+       kill_hci_filter();
 
        ALOGV("%s: Exit ", __func__);
 }
@@ -378,25 +399,24 @@ int start_hci_filter() {
        int i, init_success = -1;
        char value[PROPERTY_VALUE_MAX] = {'\0'};
 
-       property_get_bt(BT_VND_FILTER_START, value, false);
-
-       if (strcmp(value, "true") == 0) {
-           ALOGI("%s: hci_filter has been started already", __func__);
-           //Filter should have been started OR in the process of initializing
-           //Make sure of hci_filter_status and return the state based on it
-       } else {
-           property_set_bt("wc_transport.clean_up","0");
-           property_set_bt("wc_transport.hci_filter_status", "0");
-
-           property_set_bt(BT_VND_FILTER_START, "true");
-           ALOGV("%s: %s set to true ", __func__, BT_VND_FILTER_START );
-       }
-
-       /*If there are back to back ON requests from different clients,
-         All client should come and stuck in this while loop till FILTER
-         comesup and ready to accept the connections */
-       //sched_yield();
        for(i=0; i<45; i++) {
+          property_get_bt(BT_VND_FILTER_START, value, false);
+
+          if (strcmp(value, "true") == 0) {
+              ALOGI("%s: hci_filter has been started already", __func__);
+              //Filter should have been started OR in the process of initializing
+              //Make sure of hci_filter_status and return the state based on it
+          } else {
+              property_set_bt("wc_transport.clean_up","0");
+              property_set_bt("wc_transport.hci_filter_status", "0");
+              property_set_bt(BT_VND_FILTER_START, "true");
+              ALOGV("%s: %s set to true ", __func__, BT_VND_FILTER_START );
+          }
+
+          /*If there are back to back ON requests from different clients,
+            All client should come and stuck in this while loop till FILTER
+            comesup and ready to accept the connections */
+          //sched_yield();
           property_get_bt("wc_transport.hci_filter_status", value, "0");
           if (strcmp(value, "1") == 0) {
              init_success = 1;
@@ -453,7 +473,7 @@ static int bt_powerup(int en )
 #endif
 
     /* Assign rfkill_id and find bluetooth rfkill state path*/
-    for(i = 0; (q->rfkill_id == -1) && (q->rfkill_state == NULL); i++)
+    for(i = 0; (q.rfkill_id == -1) && (q.rfkill_state == NULL); i++)
     {
         snprintf(rfkill_type, sizeof(rfkill_type), "/sys/class/rfkill/rfkill%d/type", i);
         if ((fd = open(rfkill_type, O_RDONLY)) < 0)
@@ -472,17 +492,17 @@ static int bt_powerup(int en )
 
         if ((size >= 9) && !memcmp(type, "bluetooth", 9))
         {
-            asprintf(&q->rfkill_state, "/sys/class/rfkill/rfkill%d/state", q->rfkill_id = i);
+            asprintf(&q.rfkill_state, "/sys/class/rfkill/rfkill%d/state", q.rfkill_id = i);
             break;
         }
     }
 
     /* Get rfkill State to control */
-    if (q->rfkill_state != NULL)
+    if (q.rfkill_state != NULL)
     {
-        if ((fd = open(q->rfkill_state, O_RDWR)) < 0)
+        if ((fd = open(q.rfkill_state, O_RDWR)) < 0)
         {
-            ALOGE("open(%s) for write failed: %s (%d)", q->rfkill_state, strerror(errno), errno);
+            ALOGE("open(%s) for write failed: %s (%d)", q.rfkill_state, strerror(errno), errno);
 #ifdef WIFI_BT_STATUS_SYNC
             bt_semaphore_release(lock_fd);
             bt_semaphore_destroy(lock_fd);
@@ -501,7 +521,7 @@ static int bt_powerup(int en )
     }
 
 #ifdef ANDROID
-    ret = asprintf(&enable_ldo_path, "/sys/class/rfkill/rfkill%d/device/extldo", rfkill_id);
+    ret = asprintf(&enable_ldo_path, "/sys/class/rfkill/rfkill%d/device/extldo", q.rfkill_id);
     if( (ret < 0 ) || (enable_ldo_path == NULL) )
     {
         ALOGE("Memory Allocation failure");
@@ -523,7 +543,7 @@ static int bt_powerup(int en )
         if (ret < 0) {
             ALOGI("%s: Not able to set property wc_transport.extldo\n", __func__);
         }
-        q->enable_extldo = TRUE;
+        q.enable_extldo = TRUE;
     }
 #endif
 
@@ -533,7 +553,7 @@ static int bt_powerup(int en )
         property_set_bt("wc_transport.soc_initialized", "0");
     }
 
-    if (q->soc_type >= BT_SOC_CHEROKEE && q->soc_type < BT_SOC_RESERVED) {
+    if (q.soc_type >= BT_SOC_CHEROKEE && q.soc_type < BT_SOC_RESERVED) {
        ALOGI("open bt power devnode,send ioctl power op  :%d ",en);
        fd_btpower = open(BT_PWR_CNTRL_DEVICE, O_RDWR, O_NONBLOCK);
        if (fd_btpower < 0) {
@@ -554,7 +574,7 @@ static int bt_powerup(int en )
        /* Write value to control rfkill */
        if(fd >= 0) {
            if ((size = write(fd, &on, 1)) < 0) {
-               ALOGE("write(%s) failed: %s (%d)", q->rfkill_state, strerror(errno), errno);
+               ALOGE("write(%s) failed: %s (%d)", q.rfkill_state, strerror(errno), errno);
 #ifdef WIFI_BT_STATUS_SYNC
                bt_semaphore_release(lock_fd);
                bt_semaphore_destroy(lock_fd);
@@ -649,7 +669,6 @@ static inline void print_bdaddr(unsigned char *addr)
 static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
 {
     char prop[PROPERTY_VALUE_MAX] = {0};
-    struct bt_qcom_struct *temp = NULL;
     int ret = BT_STATUS_SUCCESS, i;
 
     ALOGI("++%s", __FUNCTION__);
@@ -659,14 +678,6 @@ static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
         ret = -BT_STATUS_INVAL;
         goto out;
     }
-
-    temp = (struct bt_qcom_struct *) malloc(sizeof(*q));
-    if (!temp) {
-        ALOGE("Failed to allocate memory. err %s(%d)", strerror(errno), errno);
-        ret = -BT_STATUS_NOMEM;
-        goto out;
-	}
-	memset(temp, 0, sizeof(*temp));
 
 #ifndef ANDROID
     int len;    /* length of sockaddr */
@@ -693,18 +704,18 @@ static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
 #endif
 #endif
 
-    temp->rfkill_id = -1;
-    temp->enable_extldo = FALSE;
-    temp->cb = cb;
-    temp->ant_fd = -1;
-    temp->soc_type = get_bt_soc_type();
-    soc_init(temp->soc_type);
+    q.rfkill_id = -1;
+    q.enable_extldo = FALSE;
+    q.cb = cb;
+    q.ant_fd = -1;
+    q.soc_type = get_bt_soc_type();
+    soc_init(q.soc_type);
 
-    le2bd(bdaddr, temp->bdaddr);
-    print_bdaddr(temp->bdaddr);
+    le2bd(bdaddr, q.bdaddr);
+    print_bdaddr(q.bdaddr);
     snprintf(prop, sizeof(prop), "%02x:%02x:%02x:%02x:%02x:%02x",
-             temp->bdaddr[0], temp->bdaddr[1], temp->bdaddr[2],
-             temp->bdaddr[3], temp->bdaddr[4], temp->bdaddr[5]);
+             q.bdaddr[0], q.bdaddr[1], q.bdaddr[2],
+             q.bdaddr[3], q.bdaddr[4], q.bdaddr[5]);
     ret = property_set_bt("wc_transport.stack_bdaddr", prop);
     if (ret < 0) {
         ALOGE("Failed to set wc_transport.stack_bdaddr prop, ret = %d", ret);
@@ -718,12 +729,9 @@ static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
 #endif /* WIFI_BT_STATUS_SYNC */
 
     /* Everything successful */
-    q = temp;
     return ret;
 
 out:
-    if (temp)
-        free(temp);
     ALOGI("--%s ret %d", __FUNCTION__, ret);
     return ret;
 }
@@ -859,7 +867,7 @@ static int bt_onoff_script(int n_state)
 #endif
 
 /* flavor of op without locks */
-static int __op(bt_vendor_opcode_t opcode, void *param)
+static int op(bt_vendor_opcode_t opcode, void *param)
 {
     int retval = BT_STATUS_SUCCESS;
     int nCnt = 0;
@@ -887,10 +895,6 @@ static int __op(bt_vendor_opcode_t opcode, void *param)
         case FM_VND_OP_POWER_CTRL:
             {
               is_fm_req = true;
-              if (is_soc_initialized()) {
-                  // add any FM specific actions  if needed in future
-                  break;
-              }
             }
 #endif
         case BT_VND_OP_POWER_CTRL:
@@ -903,7 +907,7 @@ static int __op(bt_vendor_opcode_t opcode, void *param)
                 ALOGI("bt-vendor : BT_VND_OP_POWER_CTRL: %s",
                         (nState == BT_VND_PWR_ON)? "On" : "Off" );
 
-                switch(q->soc_type)
+                switch(q.soc_type)
                 {
                     case BT_SOC_DEFAULT:
                         if (readTrpState())
@@ -930,7 +934,9 @@ static int __op(bt_vendor_opcode_t opcode, void *param)
                     case BT_SOC_AR3K:
                     case BT_SOC_CHEROKEE:
                         /* BT Chipset Power Control through Device Tree Node */
+                        pthread_mutex_lock(&q_lock);
                         retval = bt_powerup(nState);
+                        pthread_mutex_unlock(&q_lock);
                     default:
                         break;
                 }
@@ -939,10 +945,10 @@ static int __op(bt_vendor_opcode_t opcode, void *param)
 
         case BT_VND_OP_FW_CFG: {
                 /* call hciattach to initalize the stack */
-                if (q->soc_type == BT_SOC_ROME) {
+                if (q.soc_type == BT_SOC_ROME) {
                     if (is_soc_initialized()) {
                         ALOGI("Bluetooth FW and transport layer are initialized");
-                        q->cb->fwcfg_cb(BT_VND_OP_RESULT_SUCCESS);
+                        q.cb->fwcfg_cb(BT_VND_OP_RESULT_SUCCESS);
                     } else {
                         ALOGE("bt_vendor_cbacks is null or SoC not initialized");
                         ALOGE("Error : hci, smd initialization Error");
@@ -950,13 +956,13 @@ static int __op(bt_vendor_opcode_t opcode, void *param)
                     }
                 } else {
                     ALOGI("Bluetooth FW and transport layer are initialized");
-                    q->cb->fwcfg_cb(BT_VND_OP_RESULT_SUCCESS);
+                    q.cb->fwcfg_cb(BT_VND_OP_RESULT_SUCCESS);
                 }
         }
             break;
 
         case BT_VND_OP_SCO_CFG:
-            q->cb->scocfg_cb(BT_VND_OP_RESULT_SUCCESS); //dummy
+            q.cb->scocfg_cb(BT_VND_OP_RESULT_SUCCESS); //dummy
             break;
 #ifdef ENABLE_ANT
         case BT_VND_OP_ANT_USERIAL_OPEN:
@@ -980,17 +986,17 @@ userial_open:
                 int (*fd_array)[] = (int (*)[]) param;
                 int idx, fd = -1, fd_filter = -1;
                 ALOGI("bt-vendor : BT_VND_OP_USERIAL_OPEN");
-                switch(q->soc_type)
+                switch(q.soc_type)
                 {
                     case BT_SOC_DEFAULT:
                         {
-                            if(bt_hci_init_transport(q->fd) != -1){
+                            if(bt_hci_init_transport(q.fd) != -1){
                                 int (*fd_array)[] = (int (*) []) param;
 
-                                    (*fd_array)[CH_CMD] = q->fd[0];
-                                    (*fd_array)[CH_EVT] = q->fd[0];
-                                    (*fd_array)[CH_ACL_OUT] = q->fd[1];
-                                    (*fd_array)[CH_ACL_IN] = q->fd[1];
+                                    (*fd_array)[CH_CMD] = q.fd[0];
+                                    (*fd_array)[CH_EVT] = q.fd[0];
+                                    (*fd_array)[CH_ACL_OUT] = q.fd[1];
+                                    (*fd_array)[CH_ACL_IN] = q.fd[1];
                             }
                             else {
                                 retval = -1;
@@ -1065,7 +1071,7 @@ userial_open:
                                         }
                                         if (i == 6 && !ignore_boot_prop) {
                                             ALOGV("Valid BD address read from prop");
-                                            memcpy(q->bdaddr, local_bd_addr_from_prop, sizeof(vnd_local_bd_addr));
+                                            memcpy(q.bdaddr, local_bd_addr_from_prop, sizeof(vnd_local_bd_addr));
                                             ignore_boot_prop = FALSE;
                                         } else {
                                             ALOGE("There are not enough tokens in BD addr");
@@ -1091,12 +1097,12 @@ userial_open:
                                 }
 #endif //READ_BT_ADDR_FROM_PROP
                                     /* Always read BD address from NV file */
-                                if(ignore_boot_prop && !bt_vendor_nv_read(1, q->bdaddr))
+                                if(ignore_boot_prop && !bt_vendor_nv_read(1, q.bdaddr))
                                 {
                                    /* Since the BD address is configured in boot time We should not be here */
                                    ALOGI("Failed to read BD address. Use the one from bluedroid stack/ftm");
                                 }
-                                if(rome_soc_init(fd, (char*)q->bdaddr)<0) {
+                                if(rome_soc_init(fd, (char*)q.bdaddr)<0) {
                                     retval = -1;
                                 } else {
                                     ALOGV("rome_soc_init is completed");
@@ -1119,7 +1125,7 @@ userial_open:
 #ifdef ENABLE_ANT
                                     if (is_ant_req) {
                                         ALOGI("%s: connect to ant channel", __func__);
-                                        q->ant_fd = fd_filter = connect_to_local_socket(ANT_SOCK);
+                                        q.ant_fd = fd_filter = connect_to_local_socket(ANT_SOCK);
                                     }
                                     else
 #endif
@@ -1156,7 +1162,7 @@ userial_open:
                                     }
                                 }
                             } else {
-                                if (q->soc_type == BT_SOC_ROME)
+                                if (q.soc_type == BT_SOC_ROME)
                                     ALOGE("Failed to initialize ROME Controller!!!");
                             }
 
@@ -1182,14 +1188,14 @@ userial_open:
 #ifdef ENABLE_ANT
                                 if (is_ant_req) {
                                     ALOGI("%s: connect to ant channel", __func__);
-                                    q->ant_fd = fd_filter = connect_to_local_socket(ANT_SOCK);
+                                    q.ant_fd = fd_filter = connect_to_local_socket(ANT_SOCK);
                                 }
                                 else
 #endif
 #ifdef FM_OVER_UART
-                                if (is_fm_req && (q->soc_type >=BT_SOC_ROME && q->soc_type < BT_SOC_RESERVED)) {
+                                if (is_fm_req && (q.soc_type >=BT_SOC_ROME && q.soc_type < BT_SOC_RESERVED)) {
                                     ALOGI("%s: connect to fm channel", __func__);
-                                    q->fm_fd = fd_filter = connect_to_local_socket(FM_SOCK);
+                                    q.fm_fd = fd_filter = connect_to_local_socket(FM_SOCK);
                                 }
                                 else
 #endif
@@ -1225,20 +1231,22 @@ userial_open:
                         }
                         break;
                     default:
-                        ALOGE("Unknown soc_type: 0x%x", q->soc_type);
+                        ALOGE("Unknown soc_type: 0x%x", q.soc_type);
                         break;
                   }
             } break;
 #ifdef ENABLE_ANT
         case BT_VND_OP_ANT_USERIAL_CLOSE:
             {
+                pthread_mutex_lock(&q_lock);
                 ALOGI("bt-vendor : BT_VND_OP_ANT_USERIAL_CLOSE");
                 property_set_bt("wc_transport.clean_up","1");
-                if (q->ant_fd != -1) {
+                if (q.ant_fd != -1) {
                     ALOGE("closing ant_fd");
-                    close(q->ant_fd);
-                    q->ant_fd = -1;
+                    close(q.ant_fd);
+                    q.ant_fd = -1;
                 }
+                pthread_mutex_unlock(&q_lock);
             }
             break;
 #endif
@@ -1247,32 +1255,34 @@ userial_open:
             {
                 ALOGI("bt-vendor : BT_VND_OP_FM_USERIAL_CLOSE");
                 property_set_bt("wc_transport.clean_up","1");
-                if (q->fm_fd != -1) {
+                if (q.fm_fd != -1) {
                     ALOGE("closing fm_fd");
-                    close(q->fm_fd);
-                    q->fm_fd = -1;
+                    close(q.fm_fd);
+                    q.fm_fd = -1;
                 }
                 break;
             }
 #endif
         case BT_VND_OP_USERIAL_CLOSE:
             {
-                ALOGI("bt-vendor : BT_VND_OP_USERIAL_CLOSE soc_type: %d", q->soc_type);
-                switch(q->soc_type)
+                ALOGI("bt-vendor : BT_VND_OP_USERIAL_CLOSE soc_type: %d", q.soc_type);
+                switch(q.soc_type)
                 {
                     case BT_SOC_DEFAULT:
-                        bt_hci_deinit_transport(q->fd);
+                        bt_hci_deinit_transport(q.fd);
                         break;
                     case BT_SOC_ROME:
                     case BT_SOC_AR3K:
                     case BT_SOC_CHEROKEE:
                     {
+                        pthread_mutex_lock(&q_lock);
                         property_set_bt("wc_transport.clean_up","1");
                         userial_vendor_close();
+                        pthread_mutex_unlock(&q_lock);
                         break;
                     }
                     default:
-                        ALOGE("Unknown soc_type: 0x%x", q->soc_type);
+                        ALOGE("Unknown soc_type: 0x%x", q.soc_type);
                         break;
                 }
             }
@@ -1291,7 +1301,7 @@ userial_open:
             break;
 
         case BT_VND_OP_LPM_SET_MODE:
-            if (q->soc_type == BT_SOC_AR3K) {
+            if (q.soc_type == BT_SOC_AR3K) {
                 if (!param) {
                     ALOGE("opcode = %d: param is null", opcode_init);
                     break;
@@ -1304,7 +1314,7 @@ userial_open:
                 else {
                     lpm_set_ar3k(UPIO_LPM_MODE, UPIO_DEASSERT, 0);
                 }
-                q->cb->lpm_cb(BT_VND_OP_RESULT_SUCCESS);
+                q.cb->lpm_cb(BT_VND_OP_RESULT_SUCCESS);
             } else {
                 int lpm_result = BT_VND_OP_RESULT_SUCCESS;
 
@@ -1320,12 +1330,12 @@ userial_open:
                     lpm_result = BT_VND_OP_RESULT_FAIL;
                 }
 
-                q->cb->lpm_cb(lpm_result);
+                q.cb->lpm_cb(lpm_result);
             }
             break;
 
         case BT_VND_OP_LPM_WAKE_SET_STATE: {
-            switch(q->soc_type) {
+            switch(q.soc_type) {
             case BT_SOC_CHEROKEE:
             case BT_SOC_ROME: {
                 if (!param) {
@@ -1343,7 +1353,7 @@ userial_open:
 
 #ifdef QCOM_BT_SIBS_ENABLE
                 ALOGI("Invoking HCI H4 callback function");
-                q->cb->lpm_set_state_cb(wake_assert);
+                q.cb->lpm_set_state_cb(wake_assert);
 #endif
             }
             break;
@@ -1360,16 +1370,16 @@ userial_open:
             case BT_SOC_DEFAULT:
                 break;
             default:
-                ALOGE("Unknown soc_type: 0x%x", q->soc_type);
+                ALOGE("Unknown soc_type: 0x%x", q.soc_type);
                 break;
             }
         }
             break;
         case BT_VND_OP_EPILOG: {
 #if (HW_NEED_END_WITH_HCI_RESET == FALSE)
-            q->cb->epilog_cb(BT_VND_OP_RESULT_SUCCESS);
+            q.cb->epilog_cb(BT_VND_OP_RESULT_SUCCESS);
 #else
-                switch(q->soc_type)
+                switch(q.soc_type)
                 {
                   case BT_SOC_CHEROKEE:
                   case BT_SOC_ROME:
@@ -1382,7 +1392,7 @@ userial_open:
                            }
                            else
                            {
-                                q->cb->epilog_cb(BT_VND_OP_RESULT_SUCCESS);
+                                q.cb->epilog_cb(BT_VND_OP_RESULT_SUCCESS);
                            }
                        }
                        break;
@@ -1402,7 +1412,7 @@ userial_open:
                      break;
                 }
 
-                switch(q->soc_type)
+                switch(q.soc_type)
                 {
                     case BT_SOC_CHEROKEE:
                             retval = 3200000;
@@ -1423,23 +1433,6 @@ out:
     return retval;
 }
 
-static int op(bt_vendor_opcode_t opcode, void *param)
-{
-    int ret;
-    ALOGV("++%s", __FUNCTION__);
-    pthread_mutex_lock(&q_lock);
-    if (!q) {
-        ALOGE("op called with NULL context");
-        ret = -BT_STATUS_INVAL;
-        goto out;
-    }
-    ret = __op(opcode, param);
-out:
-    pthread_mutex_unlock(&q_lock);
-    ALOGV("--%s ret = 0x%x", __FUNCTION__, ret);
-    return ret;
-}
-
 static void ssr_cleanup(int reason)
 {
     int pwr_state = BT_VND_PWR_OFF;
@@ -1448,16 +1441,11 @@ static void ssr_cleanup(int reason)
 
     ALOGI("++%s", __FUNCTION__);
 
-    pthread_mutex_lock(&q_lock);
-    if (!q) {
-        ALOGE("ssr_cleanup called with NULL context");
-        goto out;
-    }
     if (property_set_bt("wc_transport.patch_dnld_inprog", "null") < 0) {
         ALOGE("Failed to set property");
     }
 
-    if (q->soc_type >= BT_SOC_ROME && q->soc_type < BT_SOC_RESERVED) {
+    if (q.soc_type >= BT_SOC_ROME && q.soc_type < BT_SOC_RESERVED) {
 #ifdef ENABLE_ANT
         /*Indicate to filter by sending special byte */
         if (reason == CMD_TIMEOUT) {
@@ -1476,25 +1464,24 @@ static void ssr_cleanup(int reason)
         }
 
         /* Close both ANT channel */
-        __op(BT_VND_OP_ANT_USERIAL_CLOSE, NULL);
+        op(BT_VND_OP_ANT_USERIAL_CLOSE, NULL);
 #endif
         /* Close both BT channel */
-        __op(BT_VND_OP_USERIAL_CLOSE, NULL);
+        op(BT_VND_OP_USERIAL_CLOSE, NULL);
 
 #ifdef FM_OVER_UART
-        __op(BT_VND_OP_FM_USERIAL_CLOSE, NULL);
+        op(BT_VND_OP_FM_USERIAL_CLOSE, NULL);
 #endif
         /*CTRL OFF twice to make sure hw
          * turns off*/
 #ifdef ENABLE_ANT
-        __op(BT_VND_OP_POWER_CTRL, &pwr_state);
+        op(BT_VND_OP_POWER_CTRL, &pwr_state);
 #endif
     }
     /*Generally switching of chip should be enough*/
-    __op(BT_VND_OP_POWER_CTRL, &pwr_state);
+    op(BT_VND_OP_POWER_CTRL, &pwr_state);
 
 out:
-    pthread_mutex_unlock(&q_lock);
     ALOGI("--%s", __FUNCTION__);
 }
 
@@ -1503,9 +1490,7 @@ static void cleanup(void)
 {
     ALOGI("cleanup");
     pthread_mutex_lock(&q_lock);
-    q->cb = NULL;
-    free(q);
-    q = NULL;
+    q.cb = NULL;
     pthread_mutex_unlock(&q_lock);
 
 #ifndef ANDROID
@@ -1548,12 +1533,12 @@ bool is_download_progress () {
 
     ALOGV("%s:", __FUNCTION__);
 
-    if ((q->soc_type = get_bt_soc_type()) < 0) {
+    if ((q.soc_type = get_bt_soc_type()) < 0) {
         ALOGE("%s: Failed to detect BT SOC Type", __FUNCTION__);
         return -1;
     }
 
-    switch(q->soc_type)
+    switch(q.soc_type)
     {
         case BT_SOC_ROME:
             ALOGI("%s: ROME case", __func__);
@@ -1570,7 +1555,7 @@ bool is_download_progress () {
         case BT_SOC_DEFAULT:
             break;
         default:
-            ALOGE("Unknown btSocType: 0x%x", q->soc_type);
+            ALOGE("Unknown btSocType: 0x%x", q.soc_type);
             break;
     }
     return retval;
