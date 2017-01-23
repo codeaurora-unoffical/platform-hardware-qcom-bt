@@ -51,6 +51,7 @@
 #include "bt_vendor_persist.h"
 #include "hw_rome.h"
 #include "bt_vendor_lib.h"
+#include <sys/ioctl.h>
 
 #define WAIT_TIMEOUT 200000
 #define BT_VND_OP_GET_LINESPEED 30
@@ -60,7 +61,16 @@
 
 #define SOC_INIT_PROPERTY "wc_transport.soc_initialized"
 
+#define STOP_WCNSS_FILTER 0xDD
+#define STOP_WAIT_TIMEOUT   1000
+
+#define SOC_INIT_PROPERTY "wc_transport.soc_initialized"
+
+#ifdef PANIC_ON_SOC_CRASH
+#define BT_VND_FILTER_START "wc_transport.start_root"
+#else
 #define BT_VND_FILTER_START "wc_transport.start_hci"
+#endif
 
 #define CMD_TIMEOUT  0x22
 
@@ -69,7 +79,9 @@
 #define BT_SOCK "bt_sock"
 #else
 #define ANT_SOCK "/data/misc/bluetooth/ant_sock"
+#define CTRL_SOCK "/data/misc/bluetooth/wcnssfilter_ctrl"
 #define BT_SOCK "/data/misc/bluetooth/bt_sock"
+#define FM_SOCK "/data/misc/bluetooth/fm_sock"
 #define SOCKETNAME  "/data/misc/bluetooth/btprop"
 #endif
 
@@ -313,7 +325,7 @@ void stop_hci_filter() {
                ALOGI("%s: hci_filter has been stopped already", __func__);
            }
            else {
-               filter_ctrl = connect_to_local_socket("wcnssfilter_ctrl");
+               filter_ctrl = connect_to_local_socket(CTRL_SOCK);
                if (filter_ctrl < 0) {
                    ALOGI("%s: Error while connecting to CTRL_SOCK, filter should stopped: %d",
                           __func__, filter_ctrl);
@@ -375,6 +387,7 @@ int start_hci_filter() {
        } else {
            property_set_bt("wc_transport.clean_up","0");
            property_set_bt("wc_transport.hci_filter_status", "0");
+
            property_set_bt(BT_VND_FILTER_START, "true");
            ALOGV("%s: %s set to true ", __func__, BT_VND_FILTER_START );
        }
@@ -673,8 +686,10 @@ static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
         perror("connect");
         exit(1);
     }
-#if (BT_SOC_TYPE_ROME ||BT_SOC_TYPE_CHEROKEE)
+#if BT_SOC_TYPE_ROME
     property_set_bt("qcom.bluetooth.soc", "rome");
+#elif BT_SOC_TYPE_CHEROKEE
+    property_set_bt("qcom.bluetooth.soc", "cherokee");
 #endif
 #endif
 
@@ -1169,20 +1184,20 @@ userial_open:
 #ifdef ENABLE_ANT
                                 if (is_ant_req) {
                                     ALOGI("%s: connect to ant channel", __func__);
-                                    q->ant_fd = fd_filter = connect_to_local_socket("ant_sock");
+                                    q->ant_fd = fd_filter = connect_to_local_socket(ANT_SOCK);
                                 }
                                 else
 #endif
 #ifdef FM_OVER_UART
                                 if (is_fm_req && (q->soc_type >=BT_SOC_ROME && q->soc_type < BT_SOC_RESERVED)) {
                                     ALOGI("%s: connect to fm channel", __func__);
-                                    q->fm_fd = fd_filter = connect_to_local_socket("fm_sock");
+                                    q->fm_fd = fd_filter = connect_to_local_socket(FM_SOCK);
                                 }
                                 else
 #endif
                                 {
                                     ALOGI("%s: connect to bt channel", __func__);
-                                    vnd_userial.fd = fd_filter = connect_to_local_socket("bt_sock");
+                                    vnd_userial.fd = fd_filter = connect_to_local_socket(BT_SOCK);
 
                                 }
                                 if (fd_filter != -1) {

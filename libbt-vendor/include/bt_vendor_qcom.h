@@ -64,6 +64,9 @@
 #define UINT16_TO_STREAM(p, u16) {*(p)++ = (uint8_t)(u16); *(p)++ = (uint8_t)((u16) >> 8);}
 #define UINT32_TO_STREAM(p, u32) {*(p)++ = (uint8_t)(u32); *(p)++ = (uint8_t)((u32) >> 8); *(p)++ = (uint8_t)((u32) >> 16); *(p)++ = (uint8_t)((u32) >> 24);}
 
+#define BT_PWR_CNTRL_DEVICE    "/dev/btpower"
+#define BT_CMD_PWR_CTRL         0xbfad
+
 typedef enum {
     BT_SOC_DEFAULT = 0,
     BT_SOC_SMD = BT_SOC_DEFAULT,
