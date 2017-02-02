@@ -21,6 +21,11 @@ AM_CPPFLAGS += -DHCI_USE_MCT
 endif
 endif
 
+if MDM_CHEROKEE
+AM_CFLAGS += -DBT_SOC_TYPE_CHEROKEE
+AM_CPPFLAGS += -DBT_SOC_TYPE_CHEROKEE
+endif
+
 c_sources = \
         src/bt_vendor_qcom.c \
         src/hardware.c \
