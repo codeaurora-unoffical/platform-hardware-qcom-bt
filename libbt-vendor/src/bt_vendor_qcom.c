@@ -608,10 +608,10 @@ done:
 **   BLUETOOTH VENDOR INTERFACE LIBRARY FUNCTIONS
 **
 *****************************************************************************/
-
 static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
 {
-    int i;
+    int i, ret;
+    char prop[PROPERTY_VALUE_MAX] = {0};
 
     ALOGI("bt-vendor : init");
 
@@ -681,6 +681,21 @@ static int init(const bt_vendor_callbacks_t* p_cb, unsigned char *local_bdaddr)
                                                 vnd_local_bd_addr[3],
                                                 vnd_local_bd_addr[4],
                                                 vnd_local_bd_addr[5]);
+
+    snprintf(prop, sizeof(prop), "%02x:%02x:%02x:%02x:%02x:%02x",
+                                                vnd_local_bd_addr[0],
+                                                vnd_local_bd_addr[1],
+                                                vnd_local_bd_addr[2],
+                                                vnd_local_bd_addr[3],
+                                                vnd_local_bd_addr[4],
+                                                vnd_local_bd_addr[5]);
+
+    ret = property_set_bt("wc_transport.stack_bdaddr", prop);
+
+    if (ret < 0) {
+        ALOGE("Failed to set wc_transport.stack_bdaddr prop, ret = %d", ret);
+        return -1;
+    }
 
 #ifdef WIFI_BT_STATUS_SYNC
     isInit = 1;
