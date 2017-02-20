@@ -388,7 +388,7 @@ int start_hci_filter() {
            //Filter should have been started OR in the process of initializing
            //Make sure of hci_filter_status and return the state based on it
        } else {
-           property_set("wc_transport.clean_up","0");
+           property_set_bt("wc_transport.clean_up","0");
            property_set_bt("wc_transport.hci_filter_status", "0");
            property_set_bt(BT_VND_FILTER_START, "true");
 
