@@ -35,7 +35,12 @@ extern "C" {
 #define LOG_TAG "bt_vendor"
 
 #include <sys/socket.h>
+#ifdef ANDROID
 #include <utils/Log.h>
+#else
+#include <stdio.h>
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
@@ -54,7 +59,11 @@ extern "C" {
 #include "hci_uart.h"
 #include "hw_rome.h"
 
+#ifdef ANDROID
 #define BT_VERSION_FILEPATH "/data/misc/bluedroid/bt_fw_version.txt"
+#else
+#define BT_VERSION_FILEPATH "/etc/data/misc/bluedroid/bt_fw_version.txt"
+#endif
 
 #ifdef __cplusplus
 }
@@ -141,8 +150,9 @@ int get_vs_hci_event(unsigned char *rsp)
         err = -EIO;
         goto failed;
     }
-
-    ALOGI("%s: Parameter Length: 0x%x", __FUNCTION__, paramlen = rsp[EVT_PLEN]);
+    paramlen = rsp[EVT_PLEN];
+    ALOGI("%s: Event Opcode: 0x%x", __FUNCTION__, rsp[EVENTCODE_OFFSET]);
+    ALOGI("%s: Parameter Length: 0x%x", __FUNCTION__, rsp[EVT_PLEN]);
     ALOGI("%s: Command response: 0x%x", __FUNCTION__, rsp[CMD_RSP_OFFSET]);
     ALOGI("%s: Response type   : 0x%x", __FUNCTION__, rsp[RSP_TYPE_OFFSET]);
 
@@ -155,30 +165,31 @@ int get_vs_hci_event(unsigned char *rsp)
         {
             case EDL_PATCH_VER_RES_EVT:
             case EDL_APP_VER_RES_EVT:
-                ALOGI("\t Current Product ID\t\t: 0x%08x",
-                    productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET +3] << 24 |
+                productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET +3] << 24 |
                                         rsp[PATCH_PROD_ID_OFFSET+2] << 16 |
                                         rsp[PATCH_PROD_ID_OFFSET+1] << 8 |
-                                        rsp[PATCH_PROD_ID_OFFSET]  ));
+                                        rsp[PATCH_PROD_ID_OFFSET]  );
+                ALOGI("\t Current Product ID\t\t: 0x%08x", productid);
 
                 /* Patch Version indicates FW patch version */
-                ALOGI("\t Current Patch Version\t\t: 0x%04x",
-                    (patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET + 1] << 8 |
-                                            rsp[PATCH_PATCH_VER_OFFSET] )));
+                patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET + 1] << 8 |
+                                            rsp[PATCH_PATCH_VER_OFFSET] );
+                ALOGI("\t Current Patch Version\t\t: 0x%04x", patchversion);
 
                 /* ROM Build Version indicates ROM build version like 1.0/1.1/2.0 */
                 ALOGI("\t Current ROM Build Version\t: 0x%04x", buildversion =
                     (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET + 1] << 8 |
-                                            rsp[PATCH_ROM_BUILD_VER_OFFSET] ));
+                                            rsp[PATCH_ROM_BUILD_VER_OFFSET]));
 
                 /* In case rome 1.0/1.1, there is no SOC ID version available */
                 if (paramlen - 10)
                 {
-                    ALOGI("\t Current SOC Version\t\t: 0x%08x", soc_id =
+                    soc_id =
                         (unsigned int)(rsp[PATCH_SOC_VER_OFFSET +3] << 24 |
                                                 rsp[PATCH_SOC_VER_OFFSET+2] << 16 |
                                                 rsp[PATCH_SOC_VER_OFFSET+1] << 8 |
-                                                rsp[PATCH_SOC_VER_OFFSET]  ));
+                                                rsp[PATCH_SOC_VER_OFFSET]  );
+                    ALOGI("\t Current SOC Version\t\t: 0x%08x", soc_id);
                 }
 
                 if (NULL != (btversionfile = fopen(BT_VERSION_FILEPATH, "wb"))) {
@@ -281,7 +292,7 @@ int get_vs_hci_event(unsigned char *rsp)
             if ((rsp[4] & ADDON_FEATURES_EVT_WIPOWER_MASK))
             {
                ALOGD("%s: WiPower feature supported!!", __FUNCTION__);
-               property_set("persist.bluetooth.a4wp", "true");
+               property_set_bt("persist.bluetooth.a4wp", "true");
             }
             break;
         case HCI_VS_STRAY_EVT:
@@ -866,17 +877,17 @@ int rome_get_tlv_file(char *file_path)
     gTlv_dwndCfg = ptlv_header->tlv.patch.dwnd_cfg;
 
     if(ptlv_header->tlv_type == TLV_TYPE_PATCH){
-        ALOGI("====================================================");
-        ALOGI("TLV Type\t\t\t : 0x%x", ptlv_header->tlv_type);
-        ALOGI("Length\t\t\t : %d bytes", (ptlv_header->tlv_length1) |
+        ALOGI("====================================================\n");
+        ALOGI("TLV Type\t\t\t : 0x%x\n", ptlv_header->tlv_type);
+        ALOGI("Length\t\t\t : %d bytes\n", (ptlv_header->tlv_length1) |
                                                     (ptlv_header->tlv_length2 << 8) |
                                                     (ptlv_header->tlv_length3 << 16));
-        ALOGI("Total Length\t\t\t : %d bytes", ptlv_header->tlv.patch.tlv_data_len);
-        ALOGI("Patch Data Length\t\t\t : %d bytes",ptlv_header->tlv.patch.tlv_patch_data_len);
-        ALOGI("Signing Format Version\t : 0x%x", ptlv_header->tlv.patch.sign_ver);
-        ALOGI("Signature Algorithm\t\t : 0x%x", ptlv_header->tlv.patch.sign_algorithm);
-        ALOGI("Event Handling\t\t\t : 0x%x", ptlv_header->tlv.patch.dwnd_cfg);
-        ALOGI("Reserved\t\t\t : 0x%x", ptlv_header->tlv.patch.reserved1);
+        ALOGI("Total Length\t\t\t : %d bytes\n", ptlv_header->tlv.patch.tlv_data_len);
+        ALOGI("Patch Data Length\t\t\t : %d bytes\n",ptlv_header->tlv.patch.tlv_patch_data_len);
+        ALOGI("Signing Format Version\t : 0x%x\n", ptlv_header->tlv.patch.sign_ver);
+        ALOGI("Signature Algorithm\t\t : 0x%x\n", ptlv_header->tlv.patch.sign_algorithm);
+        ALOGI("Event Handling\t\t\t : 0x%x\n", ptlv_header->tlv.patch.dwnd_cfg);
+        ALOGI("Reserved\t\t\t : 0x%x\n", ptlv_header->tlv.patch.reserved1);
         ALOGI("Product ID\t\t\t : 0x%04x\n", ptlv_header->tlv.patch.prod_id);
         ALOGI("Rom Build Version\t\t : 0x%04x\n", ptlv_header->tlv.patch.build_ver);
         ALOGI("Patch Version\t\t : 0x%04x\n", ptlv_header->tlv.patch.patch_ver);
@@ -885,11 +896,12 @@ int rome_get_tlv_file(char *file_path)
         ALOGI("====================================================");
 
     } else if(ptlv_header->tlv_type == TLV_TYPE_NVM) {
-        ALOGI("====================================================");
-        ALOGI("TLV Type\t\t\t : 0x%x", ptlv_header->tlv_type);
-        ALOGI("Length\t\t\t : %d bytes",  nvm_length = (ptlv_header->tlv_length1) |
-                                                    (ptlv_header->tlv_length2 << 8) |
-                                                    (ptlv_header->tlv_length3 << 16));
+        ALOGI("====================================================\n");
+        ALOGI("TLV Type\t\t\t : 0x%x\n", ptlv_header->tlv_type);
+        nvm_length = ((ptlv_header->tlv_length1) |
+                     (ptlv_header->tlv_length2 << 8) |
+                     (ptlv_header->tlv_length3 << 16));
+        ALOGI("Length\t\t\t : %d bytes\n", nvm_length);
 
         if(nvm_length <= 0)
             return readSize;
@@ -898,7 +910,8 @@ int rome_get_tlv_file(char *file_path)
              nvm_index < nvm_length ; nvm_ptr = (tlv_nvm_hdr *) nvm_byte_ptr)
        {
             ALOGI("TAG ID\t\t\t : %d", nvm_ptr->tag_id);
-            ALOGI("TAG Length\t\t\t : %d", nvm_tag_len = nvm_ptr->tag_len);
+            nvm_tag_len = nvm_ptr->tag_len;
+            ALOGI("TAG Length\t\t\t : %d", nvm_tag_len);
             ALOGI("TAG Pointer\t\t\t : %d", nvm_ptr->tag_ptr);
             ALOGI("TAG Extended Flag\t\t : %d", nvm_ptr->tag_ex_flag);
 
@@ -961,6 +974,8 @@ int rome_tlv_dnld_segment(int fd, int index, int seg_size, unsigned char wait_cc
     }
 
     if(wait_cc_evt) {
+        /* Initialize the RSP packet everytime to 0 */
+        memset(rsp, 0x0, HCI_MAX_EVENT_SIZE);
         err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
         if ( err < 0) {
             ALOGE("%s: Failed to downlaod patch segment: %d!",  __FUNCTION__, index);
@@ -979,43 +994,53 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
 
     total_segment = tlv_size/MAX_SIZE_PER_TLV_SEGMENT;
     remain_size = (tlv_size < MAX_SIZE_PER_TLV_SEGMENT)?\
-        tlv_size: (tlv_size%MAX_SIZE_PER_TLV_SEGMENT);
+                  tlv_size: (tlv_size%MAX_SIZE_PER_TLV_SEGMENT);
 
     ALOGI("%s: TLV size: %d, Total Seg num: %d, remain size: %d",
-        __FUNCTION__,tlv_size, total_segment, remain_size);
+            __FUNCTION__,tlv_size, total_segment, remain_size);
 
     if (gTlv_type == TLV_TYPE_PATCH) {
-       /* Prior to Rome version 3.2(including inital few rampatch release of Rome 3.2), the event
-        * handling mechanism is ROME_SKIP_EVT_NONE. After few release of rampatch for Rome 3.2, the
-        * mechamism is changed to ROME_SKIP_EVT_VSE_CC. Rest of the mechanism is not used for now
-        */
-       switch(gTlv_dwndCfg)
-       {
-           case ROME_SKIP_EVT_NONE:
-              wait_vsc_evt = TRUE;
-              wait_cc_evt = TRUE;
-              ALOGI("Event handling type: ROME_SKIP_EVT_NONE");
-              break;
-           case ROME_SKIP_EVT_VSE_CC:
-              wait_vsc_evt = FALSE;
-              wait_cc_evt = FALSE;
-              ALOGI("Event handling type: ROME_SKIP_EVT_VSE_CC");
-              break;
-           /* Not handled for now */
-           case ROME_SKIP_EVT_VSE:
-           case ROME_SKIP_EVT_CC:
-           default:
-              ALOGE("Unsupported Event handling: %d", gTlv_dwndCfg);
-              break;
-       }
+        /* Prior to Rome version 3.2(including inital few rampatch release of Rome 3.2), the event
+         * handling mechanism is ROME_SKIP_EVT_NONE. After few release of rampatch for Rome 3.2, the
+         * mechamism is changed to ROME_SKIP_EVT_VSE_CC. Rest of the mechanism is not used for now
+         */
+        switch(gTlv_dwndCfg)
+        {
+            case ROME_SKIP_EVT_NONE:
+                wait_vsc_evt = TRUE;
+                wait_cc_evt = TRUE;
+                ALOGI("Event handling type: ROME_SKIP_EVT_NONE");
+                break;
+            case ROME_SKIP_EVT_VSE_CC:
+                wait_vsc_evt = FALSE;
+                wait_cc_evt = FALSE;
+                ALOGI("Event handling type: ROME_SKIP_EVT_VSE_CC");
+                break;
+                /* Not handled for now */
+            case ROME_SKIP_EVT_VSE:
+            case ROME_SKIP_EVT_CC:
+            default:
+                ALOGE("Unsupported Event handling: %d", gTlv_dwndCfg);
+                break;
+        }
     } else {
+        /* This is for the NV items.
+         * Expectation is to have the CCE and VSE for each segment except last segment
+         * For the last segment, we should get only the VSE
+         */
         wait_vsc_evt = TRUE;
         wait_cc_evt = TRUE;
     }
 
     for(i=0;i<total_segment ;i++){
         if ((i+1) == total_segment) {
-             if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+            if ((chipset_ver == TUFELLO_VER_1_1) && (gTlv_type == TLV_TYPE_PATCH)) {
+                if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
+                    wait_cc_evt = !remain_size ? FALSE: TRUE;
+                } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
+                    wait_vsc_evt = !remain_size ? TRUE: FALSE;
+                 }
+            } else if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
                /* If the Rome version is from 1.1 to 3.1
                 * 1. No CCE for the last command segment but all other segment
                 * 2. All the command segments get VSE including the last one
@@ -1042,7 +1067,13 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
         patch_dnld_pending = FALSE;
     }
 
-    if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
+    if ((chipset_ver == TUFELLO_VER_1_1) && (gTlv_type == TLV_TYPE_PATCH)) {
+        if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
+            wait_cc_evt = remain_size ? FALSE: TRUE;
+        } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
+            wait_vsc_evt = remain_size ? TRUE: FALSE;
+        }
+    } else if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
        /* If the Rome version is from 1.1 to 3.1
         * 1. No CCE for the last command segment but all other segment
         * 2. All the command segments get VSE including the last one
@@ -1064,6 +1095,7 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
     patch_dnld_pending = TRUE;
     if(remain_size) err =rome_tlv_dnld_segment(fd, i, remain_size, wait_cc_evt);
     patch_dnld_pending = FALSE;
+
 error:
     if(patch_dnld_pending) patch_dnld_pending = FALSE;
     return err;
@@ -1756,7 +1788,7 @@ void enable_controller_log (int fd, unsigned char wait_for_evt)
    unsigned char rsp[HCI_MAX_EVENT_SIZE];
    char value[PROPERTY_VALUE_MAX] = {'\0'};
 
-   property_get("persist.service.bdroid.soclog", value, "false");
+   property_get_bt("persist.service.bdroid.soclog", value, "false");
 
    // value at cmd[5]: 1 - to enable, 0 - to disable
    ret = (strcmp(value, "true") == 0) ? cmd[5] = 0x01: 0;
@@ -1901,6 +1933,14 @@ int rome_soc_init(int fd, char *bdaddr)
             nvm_file_path = ROME_NVM_TLV_3_0_2_PATH;
             fw_su_info = ROME_3_2_FW_SU;
             fw_su_offset =  ROME_3_2_FW_SW_OFFSET;
+            goto download;
+        case TUFELLO_VER_1_0:
+            rampatch_file_path = TF_RAMPATCH_TLV_1_0_0_PATH;
+            nvm_file_path = TF_NVM_TLV_1_0_0_PATH;
+            goto download;
+        case TUFELLO_VER_1_1:
+            rampatch_file_path = TF_RAMPATCH_TLV_1_0_1_PATH;
+            nvm_file_path = TF_NVM_TLV_1_0_1_PATH;
 
 download:
             /* Change baud rate 115.2 kbps to 3Mbps*/
@@ -1924,7 +1964,6 @@ download:
                 //Ignore the failure of ROME FW SU label information
                 err = 0;
             }
-
             /* Disable internal LDO to use external LDO instead*/
             err = disable_internal_ldo(fd);
 

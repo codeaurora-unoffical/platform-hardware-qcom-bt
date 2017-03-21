@@ -33,6 +33,10 @@ extern "C"
 #endif
 
 #include <stdio.h>
+#ifndef ANDROID
+#include <sys/types.h>
+#include <stdint.h>
+#endif
 
 #ifdef BT_NV_SUPPORT
 

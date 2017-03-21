@@ -26,7 +26,9 @@
 
 #define LOG_TAG "bt_vendor"
 
+#ifdef ANDROID
 #include <utils/Log.h>
+#endif
 #include <termios.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -445,10 +447,14 @@ int userial_vendor_ioctl(userial_vendor_ioctl_op_t op, int *p_data)
 *******************************************************************************/
 int userial_set_port(char *p_conf_name, char *p_conf_value, int param)
 {
+    int len;
     RESERVED(p_conf_name);
     RESERVED(param);
-    strlcpy(vnd_userial.port_name, p_conf_value, VND_PORT_NAME_MAXLEN);
-
+    len = strlcpy(vnd_userial.port_name, p_conf_value, VND_PORT_NAME_MAXLEN);
+    if (len >= VND_PORT_NAME_MAXLEN) {
+        ALOGE("source string is too long\n");
+        return -1;
+    }
     return 0;
 }
 
@@ -488,10 +494,9 @@ int read_hci_event(int fd, unsigned char* buf, int size)
     while (count < 3) {
             r = read(fd, buf + count, 3 - count);
             if (r <= 0)
-                    return -1;
+                return -1;
             count += r;
     }
-
     /* Now we read the parameters. */
     if (buf[2] < (size - 3))
             remain = buf[2];

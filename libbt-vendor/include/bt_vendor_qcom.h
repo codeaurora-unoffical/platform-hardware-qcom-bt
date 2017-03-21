@@ -19,6 +19,38 @@
 
 #include <stdbool.h>
 #include "bt_vendor_lib.h"
+//#include "vnd_buildcfg.h"
+
+
+#ifdef USE_GLIB
+#include <glib.h>
+#define strlcpy g_strlcpy
+#endif
+
+#ifndef ANDROID
+#include <stdio.h>
+#include <sys/ioctl.h>
+#define property_get_bt prop_get
+#define property_set_bt prop_set
+
+#define LOG_TAG "libbt-vendor : "
+#endif
+
+#ifdef USE_ANDROID_LOGGING
+#include <utils/Log.h>
+#define LOG_DEBUG(fmt, arg...) ALOGD(__VA_ARGS__)
+#define LOG_ERROR(fmt, arg...) ALOGE(__VA_ARGS__)
+#else
+#include <syslog.h>
+#define ALOGV(fmt, arg...) syslog (LOG_WARNING, LOG_TAG fmt, ##arg)
+#define ALOGD(fmt, arg...) syslog (LOG_NOTICE, LOG_TAG fmt, ##arg)
+#define ALOGI(fmt, arg...) syslog (LOG_INFO, LOG_TAG fmt, ##arg)
+#define ALOGW(fmt, arg...) syslog (LOG_WARNING, LOG_TAG  fmt, ##arg)
+#define ALOGE(fmt, arg...) syslog (LOG_ERR, LOG_TAG fmt, ##arg)
+
+#define LOG_DEBUG(fmt, arg...) syslog (LOG_NOTICE, LOG_TAG fmt, ##arg)
+#define LOG_ERROR(fmt, arg...) syslog (LOG_ERR, LOG_TAG fmt, ##arg)
+#endif
 
 #ifndef FALSE
 #define FALSE  0

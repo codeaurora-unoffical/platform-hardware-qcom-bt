@@ -24,7 +24,9 @@
 
 #define LOG_TAG "bt_vendor"
 
+#ifdef ANDROID
 #include <utils/Log.h>
+#endif
 #include <termios.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -87,14 +89,14 @@ int bt_hci_init_transport_id (int chId )
      TODO: Following sleep to be removed once SMD port is successfully
      opened immediately on return from the aforementioned open call */
 
-  property_get("bluetooth.isSSR", ssrvalue, "");
+  property_get_bt("bluetooth.isSSR", ssrvalue, "");
 
   if(ssrvalue[0] == '1')
   {
       /*reset the SSR flag */
       if(chId == 1)
       {
-          if(property_set("bluetooth.isSSR", "0") < 0)
+          if(property_set_bt("bluetooth.isSSR", "0") < 0)
           {
               ALOGE("SSR: hci_smd.c:SSR case : error in setting up property new\n ");
           }

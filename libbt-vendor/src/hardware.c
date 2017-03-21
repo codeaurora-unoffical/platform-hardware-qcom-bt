@@ -26,7 +26,12 @@
 
 #define LOG_TAG "bt_vendor"
 
+#ifdef ANDROID
 #include <utils/Log.h>
+#else
+#include <sys/types.h>
+#include <stdint.h>
+#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <signal.h>
@@ -53,11 +58,11 @@ int hw_config(int nState)
     else
         szReqSt = szState[0];
 
-    if((property_get("bluetooth.status", szBtSocStatus, "") <= 0))
+    if((property_get_bt("bluetooth.status", szBtSocStatus, "") <= 0))
     {
        if(nState == BT_VND_PWR_ON ) {
           ALOGW("Hw_config: First Time BT on after boot.Starting hciattach daemon BTStatus=%s",szBtSocStatus);
-          if (property_set("bluetooth.hciattach", szReqSt) < 0)
+          if (property_set_bt("bluetooth.hciattach", szReqSt) < 0)
           {
               ALOGE("Hw_config: Property Setting fail");
               return -1;
@@ -68,7 +73,7 @@ int hw_config(int nState)
           ALOGW("Hw_config: nState = %d", nState);
     } else {
           ALOGW("Hw_config: trigerring hciattach");
-          if (property_set("bluetooth.hciattach", szReqSt) < 0)
+          if (property_set_bt("bluetooth.hciattach", szReqSt) < 0)
           {
               ALOGE("Hw_config: Property Setting fail");
               return -1;
@@ -81,7 +86,7 @@ int hw_config(int nState)
 int readTrpState()
 {
     char szBtStatus[PROPERTY_VALUE_MAX] = {0, };
-    if(property_get("bluetooth.status", szBtStatus, "") < 0){
+    if(property_get_bt("bluetooth.status", szBtStatus, "") < 0){
         ALOGE("Fail to get bluetooth status");
         return FALSE;
     }
