@@ -33,6 +33,7 @@
 #include "bt_vendor_qcom.h"
 #include "hci_uart.h"
 #include "hci_smd.h"
+#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <cutils/sockets.h>
 #include <linux/un.h>
@@ -281,55 +282,41 @@ void stop_hci_filter() {
 
        ALOGV("%s: Entry ", __func__);
 
-       if ((soc_type = get_bt_soc_type()) == BT_SOC_CHEROKEE) {
-           property_get("wc_transport.hci_filter_status", value, "0");
-           if (strcmp(value, "0") == 0) {
-               ALOGI("%s: hci_filter has been stopped already", __func__);
+       property_get("wc_transport.hci_filter_status", value, "0");
+       if (strcmp(value, "0") == 0) {
+           ALOGI("%s: hci_filter has been stopped already", __func__);
+       }
+       else {
+           filter_ctrl = connect_to_local_socket("wcnssfilter_ctrl");
+           if (filter_ctrl < 0) {
+               ALOGI("%s: Error while connecting to CTRL_SOCK, filter should stopped: %d",
+                     __func__, filter_ctrl);
            }
            else {
-               filter_ctrl = connect_to_local_socket("wcnssfilter_ctrl");
-               if (filter_ctrl < 0) {
-                   ALOGI("%s: Error while connecting to CTRL_SOCK, filter should stopped: %d",
-                          __func__, filter_ctrl);
+               retval = write(filter_ctrl, &stop_val, 1);
+               if (retval != 1) {
+                   ALOGI("%s: problem writing to CTRL_SOCK, ignore: %d", __func__, retval);
+                   //Ignore and fallback
                }
-               else {
-                   retval = write(filter_ctrl, &stop_val, 1);
-                   if (retval != 1) {
-                       ALOGI("%s: problem writing to CTRL_SOCK, ignore: %d", __func__, retval);
-                       //Ignore and fallback
-                   }
 
-                   close(filter_ctrl);
-               }
+               close(filter_ctrl);
            }
+       }
 
-           /* Ensure Filter is closed by checking the status before
-              RFKILL 0 operation. this should ideally comeout very
-              quick */
-           for(i=0; i<500; i++) {
-               property_get(BT_VND_FILTER_START, value, "false");
-               if (strcmp(value, "false") == 0) {
-                   ALOGI("%s: WCNSS_FILTER stopped", __func__);
-                   usleep(STOP_WAIT_TIMEOUT * 10);
-                   break;
-               } else {
-                   /*sleep of 1ms, This should give enough time for FILTER to
-                   exit with all necessary cleanup*/
-                   usleep(STOP_WAIT_TIMEOUT);
-               }
+       /* Ensure Filter is closed by checking the status before
+          RFKILL 0 operation. this should ideally comeout very
+          quick */
+       for(i=0; i<500; i++) {
+           property_get(BT_VND_FILTER_START, value, "false");
+           if (strcmp(value, "false") == 0) {
+               ALOGI("%s: WCNSS_FILTER stopped", __func__);
+               usleep(STOP_WAIT_TIMEOUT * 10);
+               break;
+           } else {
+               /*sleep of 1ms, This should give enough time for FILTER to
+               exit with all necessary cleanup*/
+               usleep(STOP_WAIT_TIMEOUT);
            }
-
-           /*Never use SIGKILL to stop the filter*/
-           /* Filter will be stopped by below two conditions
-            - by Itself, When it realizes there are no CONNECTED clients
-            - Or through STOP_WCNSS_FILTER byte on Control socket
-            both of these ensure clean shutdown of chip
-           */
-           //property_set(BT_VND_FILTER_START, "false");
-       } else if (soc_type == BT_SOC_ROME) {
-           property_set(BT_VND_FILTER_START, "false");
-       } else {
-           ALOGI("%s: Unknown soc type %d, Unexpected!", __func__, soc_type);
        }
 
        ALOGV("%s: Exit ", __func__);
@@ -380,7 +367,7 @@ static int bt_powerup(int en )
 {
     char rfkill_type[64], *enable_ldo_path = NULL;
     char type[16], enable_ldo[6];
-    int fd = 0, size, i, ret, fd_ldo;
+    int fd = 0, size, i, ret, fd_ldo, fd_btpower;
 
     char disable[PROPERTY_VALUE_MAX];
     char state;
@@ -489,20 +476,36 @@ static int bt_powerup(int en )
         property_set("wc_transport.soc_initialized", "0");
     }
 
-    ALOGI("Write %c to rfkill\n", on);
-
-    /* Write value to control rfkill */
-    if(fd >= 0) {
-        if ((size = write(fd, &on, 1)) < 0) {
-            ALOGE("write(%s) failed: %s (%d)", q->rfkill_state, strerror(errno), errno);
+    if (q->soc_type >= BT_SOC_CHEROKEE && q->soc_type < BT_SOC_RESERVED) {
+       ALOGI("open bt power devnode,send ioctl power op  :%d ",en);
+       fd_btpower = open(BT_PWR_CNTRL_DEVICE, O_RDWR, O_NONBLOCK);
+       if (fd_btpower < 0) {
+           ALOGE("\nfailed to open bt device error = (%s)\n",strerror(errno));
 #ifdef WIFI_BT_STATUS_SYNC
-            bt_semaphore_release(lock_fd);
-            bt_semaphore_destroy(lock_fd);
+           bt_semaphore_release(lock_fd);
+           bt_semaphore_destroy(lock_fd);
 #endif
-            return -1;
+           return -1;
+       }
+       ret = ioctl(fd_btpower, BT_CMD_PWR_CTRL, (unsigned long)en);
+        if (ret < 0) {
+            ALOGE(" ioctl failed to power control:%d error =(%s)",ret,strerror(errno));
         }
-    }
-
+        close(fd_btpower);
+    } else {
+       ALOGI("Write %c to rfkill\n", on);
+       /* Write value to control rfkill */
+       if(fd >= 0) {
+           if ((size = write(fd, &on, 1)) < 0) {
+               ALOGE("write(%s) failed: %s (%d)", q->rfkill_state, strerror(errno), errno);
+#ifdef WIFI_BT_STATUS_SYNC
+               bt_semaphore_release(lock_fd);
+               bt_semaphore_destroy(lock_fd);
+#endif
+               return -1;
+           }
+       }
+   }
 #ifdef WIFI_BT_STATUS_SYNC
     /* query wifi status */
     property_get(WIFI_PROP_NAME, wifi_status, "");
@@ -545,7 +548,6 @@ static int bt_powerup(int en )
 done:
     if (fd >= 0)
         close(fd);
-
     return 0;
 }
 
@@ -725,6 +727,7 @@ static int __op(bt_vendor_opcode_t opcode, void *param)
     char wipower_status[PROPERTY_VALUE_MAX];
     char emb_wp_mode[PROPERTY_VALUE_MAX];
     char bt_version[PROPERTY_VALUE_MAX];
+    char lpm_config[PROPERTY_VALUE_MAX];
     bool ignore_boot_prop = TRUE;
 #ifdef READ_BT_ADDR_FROM_PROP
     int i = 0;
@@ -1151,8 +1154,21 @@ userial_open:
                 }
                 q->cb->lpm_cb(BT_VND_OP_RESULT_SUCCESS);
             } else {
-                /* respond with failure as it's  handled by other mechanism */
-                q->cb->lpm_cb(BT_VND_OP_RESULT_FAIL);
+                int lpm_result = BT_VND_OP_RESULT_SUCCESS;
+
+                property_get("persist.service.bdroid.lpmcfg", lpm_config, "all");
+                ALOGI("%s: property_get: persist.service.bdroid.lpmcfg: %s",
+                            __func__, lpm_config);
+
+                if (!strcmp(lpm_config, "all")) {
+                    // respond with success since we want to hold wake lock through LPM
+                    lpm_result = BT_VND_OP_RESULT_SUCCESS;
+                }
+                else {
+                    lpm_result = BT_VND_OP_RESULT_FAIL;
+                }
+
+                q->cb->lpm_cb(lpm_result);
             }
             break;
 
@@ -1321,9 +1337,6 @@ static void ssr_cleanup(int reason)
 #ifdef ENABLE_ANT
         __op(BT_VND_OP_POWER_CTRL, &pwr_state);
 #endif
-#ifdef FM_OVER_UART
-        __op(BT_VND_OP_POWER_CTRL, &pwr_state);
-#endif
     }
     /*Generally switching of chip should be enough*/
     __op(BT_VND_OP_POWER_CTRL, &pwr_state);
@@ -1411,6 +1424,9 @@ static bool is_debug_force_special_bytes() {
     int ret = 0;
     char value[PROPERTY_VALUE_MAX] = {'\0'};
     bool enabled = false;
+#ifdef ENABLE_DBG_FLAGS
+    enabled = true;
+#endif
 
     ret = property_get("wc_transport.force_special_byte", value, NULL);
 
