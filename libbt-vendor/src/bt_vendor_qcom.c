@@ -739,10 +739,6 @@ static int op(bt_vendor_opcode_t opcode, void *param)
         case FM_VND_OP_POWER_CTRL:
             {
               is_fm_req = true;
-              if (is_soc_initialized()) {
-                  // add any FM specific actions  if needed in future
-                  break;
-              }
             }
 #endif
         case BT_VND_OP_POWER_CTRL:
