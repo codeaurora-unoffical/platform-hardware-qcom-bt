@@ -327,24 +327,24 @@ int start_hci_filter() {
        int i, init_success = -1;
        char value[PROPERTY_VALUE_MAX] = {'\0'};
 
-       property_get(BT_VND_FILTER_START, value, false);
-
-       if (strcmp(value, "true") == 0) {
-           ALOGI("%s: hci_filter has been started already", __func__);
-           //Filter should have been started OR in the process of initializing
-           //Make sure of hci_filter_status and return the state based on it
-       } else {
-           property_set("wc_transport.clean_up","0");
-           property_set("wc_transport.hci_filter_status", "0");
-           property_set(BT_VND_FILTER_START, "true");
-           ALOGV("%s: %s set to true ", __func__, BT_VND_FILTER_START );
-       }
-
-       /*If there are back to back ON requests from different clients,
-         All client should come and stuck in this while loop till FILTER
-         comesup and ready to accept the connections */
-       //sched_yield();
        for(i=0; i<45; i++) {
+          property_get(BT_VND_FILTER_START, value, false);
+
+          if (strcmp(value, "true") == 0) {
+              ALOGI("%s: hci_filter has been started already", __func__);
+              //Filter should have been started OR in the process of initializing
+              //Make sure of hci_filter_status and return the state based on it
+          } else {
+              property_set("wc_transport.clean_up","0");
+              property_set("wc_transport.hci_filter_status", "0");
+              property_set(BT_VND_FILTER_START, "true");
+              ALOGV("%s: %s set to true ", __func__, BT_VND_FILTER_START );
+          }
+
+          /*If there are back to back ON requests from different clients,
+            All client should come and stuck in this while loop till FILTER
+            comesup and ready to accept the connections */
+          //sched_yield();
           property_get("wc_transport.hci_filter_status", value, "0");
           if (strcmp(value, "1") == 0) {
                init_success = 1;
