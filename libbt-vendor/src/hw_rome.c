@@ -1812,12 +1812,27 @@ end:
    return;
 }
 
+static bool is_extldo_enabled() {
+    bool is_extldo = false;
+    char extldo_prop[PROPERTY_VALUE_MAX];
 
+#ifdef ANDROID
+    property_get("wc_transport.extldo", extldo_prop, "disabled");
+#else
+    property_get_bt("wc_transport.extldo", extldo_prop, "disabled");
+#endif
+
+    if (!strcmp(extldo_prop, "enabled")) {
+        is_extldo = true;
+    }
+
+    return is_extldo;
+}
 /* This function is called with q_lock held and q is non-NULL */
 static int disable_internal_ldo(int fd)
 {
     int ret = 0;
-    if (q->enable_extldo) {
+    if (is_extldo_enabled()) {
         unsigned char cmd[5] = {0x01, 0x0C, 0xFC, 0x01, 0x32};
         unsigned char rsp[HCI_MAX_EVENT_SIZE];
 
