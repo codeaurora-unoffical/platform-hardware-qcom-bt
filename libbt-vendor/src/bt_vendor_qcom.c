@@ -914,7 +914,12 @@ static int op(bt_vendor_opcode_t opcode, void *param)
                              }
 
                              if (fd >= 0) {
+#ifdef WCNSS_IBS_ENABLED
+                                 ALOGI("%s: Vote UART clock off after BT is booted up if IBS is enabled", __func__);
                                  userial_clock_operation(fd, USERIAL_OP_CLK_OFF);
+#else
+                                 ALOGI("%s: NOT vote UART clock off after BT is booted up if IBS is disabled", __func__);
+#endif
                                  /*Close the UART port*/
                                  close(fd);
                              }

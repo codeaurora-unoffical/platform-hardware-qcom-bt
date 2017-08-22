@@ -52,6 +52,10 @@ ifeq ($(WIFI_BT_STATUS_SYNC), true)
 LOCAL_CFLAGS += -DWIFI_BT_STATUS_SYNC
 endif #WIFI_BT_STATUS_SYNC
 
+ifeq ($(WCNSS_FILTER_USES_SIBS),true)
+LOCAL_CFLAGS += -DWCNSS_IBS_ENABLED
+endif
+
 LOCAL_SHARED_LIBRARIES := \
         libcutils \
         liblog \
