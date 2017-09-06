@@ -1138,13 +1138,11 @@ userial_open:
                                                 rome_get_addon_feature_list(fd_filter);
                                             }
                                         }
-#ifdef ANDROID
                                         if (!skip_init) {
                                             /*Skip if already sent*/
                                             enable_controller_log(fd_filter, (is_ant_req || is_fm_req) );
                                             skip_init = true;
                                         }
-#endif
                                         for (idx=0; idx < CH_MAX; idx++)
                                             (*fd_array)[idx] = fd_filter;
                                             retval = 1;
