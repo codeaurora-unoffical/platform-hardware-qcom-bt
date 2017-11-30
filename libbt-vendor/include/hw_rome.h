@@ -187,6 +187,9 @@
 #define TF_NVM_TLV_1_0_0_PATH           "/lib/firmware/image/nvm_tlv_tf_1.0.bin"
 #define TF_RAMPATCH_TLV_1_0_1_PATH      "/lib/firmware/image/tfbtfw11.tlv"
 #define TF_NVM_TLV_1_0_1_PATH           "/lib/firmware/image/tfbtnv11.bin"
+
+#define NAPLES_RAMPATCH_TLV_UART_1_0_PATH    "/lib/firmware/image/btfwnpla.tlv"
+#define NAPLES_NVM_TLV_UART_1_0_PATH         "/lib/firmware/image/btnvnpla.bin"
 #endif
 
 #define ROME_3_1_FW_SU  "bprm.cnss.3.1"
@@ -283,6 +286,7 @@ enum{
 };
 
 enum{
+    NAPLES_PATCH_VER_0100 = 0x0100,
     ROME_PATCH_VER_0100 = 0x0100,
     ROME_PATCH_VER_0101 = 0x0101,
     ROME_PATCH_VER_0200 = 0x0200,
@@ -296,7 +300,8 @@ enum{
     ROME_SOC_ID_13 = 0x00000013,
     ROME_SOC_ID_22 = 0x00000022,
     ROME_SOC_ID_23 = 0x00000023,
-    ROME_SOC_ID_44 = 0x00000044
+    ROME_SOC_ID_44 = 0x00000044,
+    NAPLES_SOC_ID_15 = 0x00000015,
 };
 
 enum{
@@ -308,7 +313,8 @@ enum{
     ROME_VER_3_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_22 ),
     ROME_VER_3_2 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_44 ),
     TUFELLO_VER_1_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_13 ),
-    TUFELLO_VER_1_1 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_23 )
+    TUFELLO_VER_1_1 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_23 ),
+    NAPLES_VER_1_0 = ((NAPLES_PATCH_VER_0100 << 16 ) | NAPLES_SOC_ID_15 )
 };
 
 //declarations

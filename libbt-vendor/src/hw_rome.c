@@ -1071,6 +1071,12 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
         } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
             wait_vsc_evt = remain_size ? TRUE: FALSE;
         }
+    } else if ((chipset_ver == NAPLES_VER_1_0) && (gTlv_type == TLV_TYPE_PATCH)) {
+        if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
+            wait_cc_evt = remain_size ? FALSE: TRUE;
+        } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
+            wait_vsc_evt = remain_size ? TRUE: FALSE;
+        }
     } else if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
        /* If the Rome version is from 1.1 to 3.1
         * 1. No CCE for the last command segment but all other segment
@@ -1931,6 +1937,12 @@ int rome_soc_init(int fd, char *bdaddr)
         case ROME_VER_1_3:
             rampatch_file_path = ROME_RAMPATCH_TLV_1_0_3_PATH;
             nvm_file_path = ROME_NVM_TLV_1_0_3_PATH;
+            goto download;
+        case NAPLES_VER_1_0:
+            rampatch_file_path = NAPLES_RAMPATCH_TLV_UART_1_0_PATH;
+            nvm_file_path = NAPLES_NVM_TLV_UART_1_0_PATH;
+            //rome_ver = ROME_VER_3_2;	// SET to ROME 3.2 as the patch downloading workflow is same as Rome 3.2
+            //ALOGD(" set rome_ver to ROME_VER_3_2\n");
             goto download;
         case ROME_VER_2_1:
             rampatch_file_path = ROME_RAMPATCH_TLV_2_0_1_PATH;
