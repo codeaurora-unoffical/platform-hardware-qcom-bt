@@ -85,6 +85,8 @@
 #define SOCKETNAME  "/data/misc/bluetooth/btprop"
 #endif
 
+#define BT_SCRIPT_PATH "/etc/bluetooth/init.msm.bt.sh"
+
 static void wait_for_patch_download(bool is_ant_req);
 static bool is_debug_force_special_bytes(void);
 int connect_to_local_socket(char* name);
@@ -841,14 +843,14 @@ static int bt_onoff_script(int n_state)
         ALOGI("bluetooth.hciattach value is %s", hciattach_value);
 
         if (!strncasecmp(hciattach_value, "true", sizeof("true"))) {
-            ret = system("/bin/sh /data/misc/bluetooth/init.msm.bt.sh");
+            ret = system("/bin/sh " BT_SCRIPT_PATH);
 
             if (ret != 0) {
-               ALOGI("/data/misc/bluetooth/init.msm.bt.sh returned with error value: %d", ret);
+               ALOGI("%s returned with error value: %d", BT_SCRIPT_PATH, ret);
                property_set_bt("bluetooth.status", "off");
                return -1;
             }
-            ALOGI("/data/misc/bluetooth/init.msm.bt.sh executed successfully");
+            ALOGI("%s executed successfully", BT_SCRIPT_PATH);
             property_set_bt("bluetooth.status", "on");
         }
         else if (!strncasecmp(hciattach_value, "false", sizeof("false"))) {
