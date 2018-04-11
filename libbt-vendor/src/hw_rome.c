@@ -94,6 +94,17 @@ unsigned char wait_vsc_evt = TRUE;
 bool patch_dnld_pending = FALSE;
 int dnld_fd = -1;
 
+#define MAX_BTFW_PATH 256
+static btfw_rampatch_path[MAX_BTFW_PATH];
+static btfw_nvm_path[MAX_BTFW_PATH];
+
+static const char *BT_FW_DIRS[] = {
+"/lib/firmware/updates",
+"/lib/firmware/image",
+"/firmware/image",
+NULL
+};
+
 /******************************************************************************
 **  Extern variables
 ******************************************************************************/
@@ -1857,6 +1868,25 @@ static int disable_internal_ldo(int fd)
     return ret;
 }
 
+static int get_btfw_path(char *name, char *path, int path_size)
+{
+    int l;
+    char **p = BT_FW_DIRS;
+    char *b = name;
+
+    while (*p) {
+        l = snprintf(path, path_size, "%s/%s", *p, b);
+        if (l < path_size) {
+            if (!access(path, R_OK)) {
+                ALOGI("in %s : name = %s path = %s\n", __func__, name, path);
+                return 0;
+            }
+        }
+        p++;
+    }
+    return -1;
+}
+
 int rome_soc_init(int fd, char *bdaddr)
 {
     int err = -1, size = 0;
@@ -1939,8 +1969,15 @@ int rome_soc_init(int fd, char *bdaddr)
             nvm_file_path = ROME_NVM_TLV_1_0_3_PATH;
             goto download;
         case NAPLES_VER_1_0:
-            rampatch_file_path = NAPLES_RAMPATCH_TLV_UART_1_0_PATH;
-            nvm_file_path = NAPLES_NVM_TLV_UART_1_0_PATH;
+            if (get_btfw_path(basename(NAPLES_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+                rampatch_file_path = NAPLES_RAMPATCH_TLV_UART_1_0_PATH;
+            else
+                rampatch_file_path = btfw_rampatch_path;
+
+            if (get_btfw_path(basename(NAPLES_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+                nvm_file_path = NAPLES_NVM_TLV_UART_1_0_PATH;
+            else
+                nvm_file_path = btfw_nvm_path;
             //rome_ver = ROME_VER_3_2;	// SET to ROME 3.2 as the patch downloading workflow is same as Rome 3.2
             //ALOGD(" set rome_ver to ROME_VER_3_2\n");
             goto download;
