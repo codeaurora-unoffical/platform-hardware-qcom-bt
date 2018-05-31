@@ -50,6 +50,6 @@ library_includedir = $(pkgincludedir)\
 library_include_HEADERS = $(h_sources)
 lib_LTLIBRARIES = libbt-vendor.la
 libbt_vendor_la_CC = @CC@
-libbt_vendor_la_SOURCES = $(c_sources)
+libbt_vendor_la_SOURCES = $(cpp_sources)
 libbt_vendor_la_CPPFLAGS =$(AM_CPPFLAGS)
 libbt_vendor_la_LIBADD = $(requiredlibs)
