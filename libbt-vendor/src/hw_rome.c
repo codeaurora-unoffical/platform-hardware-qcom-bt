@@ -95,8 +95,8 @@ bool patch_dnld_pending = FALSE;
 int dnld_fd = -1;
 
 #define MAX_BTFW_PATH 256
-static btfw_rampatch_path[MAX_BTFW_PATH];
-static btfw_nvm_path[MAX_BTFW_PATH];
+static char btfw_rampatch_path[MAX_BTFW_PATH];
+static char btfw_nvm_path[MAX_BTFW_PATH];
 
 static const char *BT_FW_DIRS[] = {
 "/lib/firmware/updates",
@@ -1992,8 +1992,16 @@ int rome_soc_init(int fd, char *bdaddr)
             fw_su_offset = ROME_3_1_FW_SW_OFFSET;
             goto download;
         case ROME_VER_3_2:
-            rampatch_file_path = ROME_RAMPATCH_TLV_3_0_2_PATH;
-            nvm_file_path = ROME_NVM_TLV_3_0_2_PATH;
+            if (get_btfw_path(basename(ROME_RAMPATCH_TLV_3_0_2_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+                rampatch_file_path = ROME_RAMPATCH_TLV_3_0_2_PATH;
+            else
+                rampatch_file_path = btfw_rampatch_path;
+
+            if (get_btfw_path(basename(ROME_NVM_TLV_3_0_2_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+                nvm_file_path = ROME_NVM_TLV_3_0_2_PATH;
+            else
+                nvm_file_path = btfw_nvm_path;
+
             fw_su_info = ROME_3_2_FW_SU;
             fw_su_offset =  ROME_3_2_FW_SW_OFFSET;
             goto download;
