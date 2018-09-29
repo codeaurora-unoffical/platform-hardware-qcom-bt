@@ -4,6 +4,7 @@ AM_CFLAGS = -Wall \
         -Wundef \
         -Wstrict-prototypes \
         -Wno-trigraphs \
+        -Wno-unused-label \
         -std=c99 \
         -DBT_NV_SUPPORT
 
@@ -43,7 +44,7 @@ else
  libbt_vendor_la_LDFLAGS = -shared
 endif
 
-requiredlibs = -lpthread $(SYS_LIB)/libbtnv.la
+requiredlibs = -lpthread -lbtnv
 
 library_includedir = $(pkgincludedir)\
 library_include_HEADERS = $(h_sources)
