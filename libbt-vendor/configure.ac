@@ -37,6 +37,10 @@ if test "x$with_common_includes" != "xno"; then
    CFLAGS="${CFLAGS} -I${common_incdir}"
 fi
 
+AC_ARG_WITH([glib],
+     AC_HELP_STRING([--with-glib],
+        [enable glib, building HLOS systems which use glib]))
+
 if (test "x${with_glib}" = "xyes"); then
        PKG_CHECK_MODULES(GTHREAD, gthread-2.0 >= 2.16, dummy=yes,
                                AC_MSG_ERROR(GThread >= 2.16 is required))

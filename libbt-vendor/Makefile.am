@@ -4,6 +4,7 @@ AM_CFLAGS = -Wall \
         -Wundef \
         -Wstrict-prototypes \
         -Wno-trigraphs \
+        -Wno-unused-label \
         -std=c99 \
         -DBT_NV_SUPPORT
 

@@ -178,14 +178,17 @@
 #define TF_RAMPATCH_TLV_1_0_1_PATH      "/bt_firmware/image/tfbtfw11.tlv"
 #define TF_NVM_TLV_1_0_1_PATH           "/bt_firmware/image/tfbtnv11.bin"
 #else
-#define ROME_RAMPATCH_TLV_3_0_0_PATH    "/lib/firmware/btfw30.tlv"
-#define ROME_NVM_TLV_3_0_0_PATH         "/lib/firmware/btnv30.bin"
-#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/lib/firmware/btfw32.tlv"
-#define ROME_NVM_TLV_3_0_2_PATH         "/lib/firmware/btnv32.bin"
+#define ROME_RAMPATCH_TLV_3_0_0_PATH    "/lib/firmware/image/btfw30.tlv"
+#define ROME_NVM_TLV_3_0_0_PATH         "/lib/firmware/image/btnv30.bin"
+#define ROME_RAMPATCH_TLV_3_0_2_PATH    "/lib/firmware/image/btfw32.tlv"
+#define ROME_NVM_TLV_3_0_2_PATH         "/lib/firmware/image/btnv32.bin"
 #define TF_RAMPATCH_TLV_1_0_0_PATH      "/lib/firmware/image/rampatch_tlv_tf_1.0.tlv"
 #define TF_NVM_TLV_1_0_0_PATH           "/lib/firmware/image/nvm_tlv_tf_1.0.bin"
 #define TF_RAMPATCH_TLV_1_0_1_PATH      "/lib/firmware/image/tfbtfw11.tlv"
 #define TF_NVM_TLV_1_0_1_PATH           "/lib/firmware/image/tfbtnv11.bin"
+
+#define NAPLES_RAMPATCH_TLV_UART_1_0_PATH    "/lib/firmware/image/btfwnpla.tlv"
+#define NAPLES_NVM_TLV_UART_1_0_PATH         "/lib/firmware/image/btnvnpla.bin"
 #endif
 
 
@@ -260,10 +263,10 @@ typedef struct {
 
 enum{
     BAUDRATE_115200     = 0x00,
-    BAUDRATE_57600       = 0x01,
-    BAUDRATE_38400       = 0x02,
-    BAUDRATE_19200       = 0x03,
-    BAUDRATE_9600         = 0x04,
+    BAUDRATE_57600      = 0x01,
+    BAUDRATE_38400      = 0x02,
+    BAUDRATE_19200      = 0x03,
+    BAUDRATE_9600       = 0x04,
     BAUDRATE_230400     = 0x05,
     BAUDRATE_250000     = 0x06,
     BAUDRATE_460800     = 0x07,
@@ -283,6 +286,7 @@ enum{
 };
 
 enum{
+    NAPLES_PATCH_VER_0100 = 0x0100,
     ROME_PATCH_VER_0100 = 0x0100,
     ROME_PATCH_VER_0101 = 0x0101,
     ROME_PATCH_VER_0200 = 0x0200,
@@ -296,7 +300,8 @@ enum{
     ROME_SOC_ID_13 = 0x00000013,
     ROME_SOC_ID_22 = 0x00000022,
     ROME_SOC_ID_23 = 0x00000023,
-    ROME_SOC_ID_44 = 0x00000044
+    ROME_SOC_ID_44 = 0x00000044,
+    NAPLES_SOC_ID_15 = 0x00000015,
 };
 
 enum{
@@ -308,6 +313,14 @@ enum{
     ROME_VER_3_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_22 ),
     ROME_VER_3_2 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_44 ),
     TUFELLO_VER_1_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_13 ),
-    TUFELLO_VER_1_1 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_23 )
+    TUFELLO_VER_1_1 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_23 ),
+    NAPLES_VER_1_0 = ((NAPLES_PATCH_VER_0100 << 16 ) | NAPLES_SOC_ID_15 )
 };
+
+//declarations
+int rome_soc_init(int fd, char *bdaddr);
+int check_embedded_mode(int fd);
+int rome_get_addon_feature_list(int fd);
+void enable_controller_log(int fd, unsigned char req);
+void cherokee_shutdown_vs_cmd(int fd);
 #endif /* HW_ROME_H */
