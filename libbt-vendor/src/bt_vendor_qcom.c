@@ -38,7 +38,7 @@
 #include <string.h>
 #include <sys/time.h>
 #include <fcntl.h>
-#include <unistd.h> 
+#include <unistd.h>
 #endif
 #include <cutils/properties.h>
 #include <fcntl.h>
@@ -102,7 +102,7 @@ extern int chipset_ver;
 /******************************************************************************
 **  Variables
 ******************************************************************************/
-struct bt_qcom_struct q;
+struct bt_qti_struct q;
 pthread_mutex_t q_lock = PTHREAD_MUTEX_INITIALIZER;
 
 #ifndef ANDROID
@@ -666,14 +666,14 @@ static inline void print_bdaddr(unsigned char *addr)
 /*
 static bool is_prontoEnabled(void)
 {
-    if((access("/dev/smd2",R_OK))!=-1)  
+    if((access("/dev/smd2",R_OK))!=-1)
         ALOGE("%s: Read OK", __FUNCTION__);
 
-    if((access("/dev/smd2",W_OK))!=-1)  
+    if((access("/dev/smd2",W_OK))!=-1)
         ALOGE("%s: Write OK", __FUNCTION__);
 
 
-    if((access("/dev/smd2",F_OK))!=-1)  
+    if((access("/dev/smd2",F_OK))!=-1)
         return true;
     return false;
 }
@@ -682,7 +682,7 @@ static bool is_prontoEnabled(void)
 
 static bool is_NaplesEnabled(void)
 {
-    if((access("/dev/ttyHS0",R_OK))!=-1) 
+    if((access("/dev/ttyHS0",R_OK))!=-1)
         ALOGE("%s: Read OK", __FUNCTION__);
 
     if((access("/dev/ttyHS0",W_OK))!=-1)
@@ -730,7 +730,7 @@ static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
         perror("connect");
         exit(1);
     }
-    
+
     if (is_NaplesEnabled()) {
         property_set_bt("qcom.bluetooth.soc", "rome");
     }
@@ -758,7 +758,6 @@ static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
         goto out;
     }
 
-/* TODO: Move these fields inside bt_qcom context */
 #ifdef WIFI_BT_STATUS_SYNC
     isInit = 1;
 #endif /* WIFI_BT_STATUS_SYNC */

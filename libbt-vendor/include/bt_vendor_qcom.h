@@ -108,7 +108,7 @@ enum {
     BT_STATUS_PROP_FAILURE,
 };
 #define BT_CMD_PWR_CTRL         0xbfad
-struct bt_qcom_struct {
+struct bt_qti_struct {
     int fd[2];
     int ant_fd;
     int fm_fd;
@@ -119,7 +119,7 @@ struct bt_qcom_struct {
     char *rfkill_state;
     bool enable_extldo;
 };
-extern struct bt_qcom_struct q;
+extern struct bt_qti_struct q;
 
 #endif /* BT_VENDOR_QCOM_H */
 
