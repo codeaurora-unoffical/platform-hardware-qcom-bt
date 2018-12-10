@@ -233,10 +233,13 @@ static int get_bt_soc_type()
 
     ALOGI("bt-vendor : get_bt_soc_type");
 
-    ret = property_get_bt("qcom.bluetooth.soc", bt_soc_type, NULL);
-    if (!ret) {
+    ret = property_get("qcom.bluetooth.soc", bt_soc_type, NULL);
+    if (ret != 0) {
         ALOGE("qcom.bluetooth.soc set to %s\n", bt_soc_type);
         if (!strncasecmp(bt_soc_type, "rome", sizeof("rome"))) {
+            return BT_SOC_ROME;
+        }
+        else if (!strncasecmp(bt_soc_type, "naples_uart", sizeof("naples_uart"))) {
             return BT_SOC_ROME;
         }
         else if (!strncasecmp(bt_soc_type, "ath3k", sizeof("ath3k"))) {
@@ -663,36 +666,6 @@ static inline void print_bdaddr(unsigned char *addr)
             addr[2], addr[3], addr[4], addr[5]);
 }
 
-/*
-static bool is_prontoEnabled(void)
-{
-    if((access("/dev/smd2",R_OK))!=-1)
-        ALOGE("%s: Read OK", __FUNCTION__);
-
-    if((access("/dev/smd2",W_OK))!=-1)
-        ALOGE("%s: Write OK", __FUNCTION__);
-
-
-    if((access("/dev/smd2",F_OK))!=-1)
-        return true;
-    return false;
-}
-*/
-
-
-static bool is_NaplesEnabled(void)
-{
-    if((access("/dev/ttyHS0",R_OK))!=-1)
-        ALOGE("%s: Read OK", __FUNCTION__);
-
-    if((access("/dev/ttyHS0",W_OK))!=-1)
-        ALOGE("%s: Write OK", __FUNCTION__);
-
-    if((access("/dev/ttyHS0",F_OK))!=-1)
-        return true;
-    return false;
-}
-
 /*****************************************************************************
 **
 **   BLUETOOTH VENDOR INTERFACE LIBRARY FUNCTIONS
@@ -730,14 +703,7 @@ static int init(const bt_vendor_callbacks_t *cb, unsigned char *bdaddr)
         perror("connect");
         exit(1);
     }
-
-    if (is_NaplesEnabled()) {
-        property_set_bt("qcom.bluetooth.soc", "rome");
-    }
-#if BT_SOC_TYPE_CHEROKEE
-    property_set_bt("qcom.bluetooth.soc", "cherokee");
-#endif
-#endif
+#endif /* */
 
     q.rfkill_id = -1;
     q.enable_extldo = FALSE;
