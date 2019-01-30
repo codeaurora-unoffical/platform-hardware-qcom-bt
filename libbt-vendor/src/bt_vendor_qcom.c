@@ -233,6 +233,10 @@ static int get_bt_soc_type()
 
     ALOGI("bt-vendor : get_bt_soc_type");
 
+#if defined(BT_SOC_TYPE_ROME)
+    ret = BT_SOC_ROME;
+    property_set_bt("qcom.bluetooth.soc", "rome");
+#else
     ret = property_get("qcom.bluetooth.soc", bt_soc_type, NULL);
     if (ret != 0) {
         ALOGE("qcom.bluetooth.soc set to %s\n", bt_soc_type);
@@ -257,6 +261,7 @@ static int get_bt_soc_type()
         ALOGE("%s: Failed to get soc type", __FUNCTION__);
         ret = BT_SOC_DEFAULT;
     }
+#endif
 
     return ret;
 }
