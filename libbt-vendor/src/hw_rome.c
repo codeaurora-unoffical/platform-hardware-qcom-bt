@@ -838,6 +838,41 @@ error:
     return err;
 }
 
+
+void update_new_nvm_format(tlv_nvm_hdr *nvm)
+{
+  int enable_ibs = 1;
+  uint8_t *nvm_byte_ptr = (uint8_t *)nvm;
+
+  if (!nvm)
+    return;
+
+  nvm_byte_ptr += sizeof(tlv_nvm_hdr);
+  /* Update Tag#17: HCI UART Settings */
+  if (nvm->tag_id == 17) {
+    uint8_t baudrate = BAUDRATE_3000000;
+
+    ALOGI("%s: baudrate %02x", __func__, baudrate);
+
+    /* Byte#1: UART baudrate */
+    *(nvm_byte_ptr + 1) = baudrate;
+  }
+
+  /* Update Tag#27: SIBS Settings */
+  if (nvm->tag_id == 27) {
+    if (!enable_ibs) {
+      /* TxP Sleep Mode: Disable */
+      *(nvm_byte_ptr + 1) &= ~0x01;
+      ALOGI("%s: SIBS Disable", __func__);
+    } else {
+      /* TxP Sleep Mode-1:UART_SIBS, 2:USB_SUSPEND, 3: GPIO_OOB, 4: UART_HWIBS */
+      *(nvm_byte_ptr + 1) |= 0x01;
+      ALOGI("%s: SIBS Enable", __func__);
+    }
+  }
+
+}
+
 int rome_get_tlv_file(char *file_path)
 {
     FILE * pFile;
@@ -934,6 +969,10 @@ int rome_get_tlv_file(char *file_path)
                 ALOGI("BD Address: %.02x:%.02x:%.02x:%.02x:%.02x:%.02x",
                     *nvm_byte_ptr, *(nvm_byte_ptr+1), *(nvm_byte_ptr+2),
                     *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
+            }
+
+            if (IS_HASTINGS_SOC(chipset_ver)) {
+                update_new_nvm_format(nvm_ptr);
             }
 
             for(i =0;(i<nvm_ptr->tag_len && (i*3 + 2) <PRINT_BUF_SIZE);i++)
@@ -1083,6 +1122,12 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
             wait_vsc_evt = remain_size ? TRUE: FALSE;
         }
     } else if ((chipset_ver == NAPLES_VER_1_0) && (gTlv_type == TLV_TYPE_PATCH)) {
+        if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
+            wait_cc_evt = remain_size ? FALSE: TRUE;
+        } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
+            wait_vsc_evt = remain_size ? TRUE: FALSE;
+        }
+    } else if (IS_HASTINGS_SOC(chipset_ver) && (gTlv_type == TLV_TYPE_PATCH)) {
         if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
             wait_cc_evt = remain_size ? FALSE: TRUE;
         } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
@@ -1981,6 +2026,32 @@ int rome_soc_init(int fd, char *bdaddr)
             //rome_ver = ROME_VER_3_2;	// SET to ROME 3.2 as the patch downloading workflow is same as Rome 3.2
             //ALOGD(" set rome_ver to ROME_VER_3_2\n");
             goto download;
+        case HASTINGS_VER_1_0:
+        case HASTINGS_VER_1_0_1:
+        case HASTINGS_VER_1_1:
+            if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+                rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_1_0_PATH;
+            else
+                rampatch_file_path = btfw_rampatch_path;
+
+            if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+                nvm_file_path = HASTINGS_NVM_TLV_UART_1_0_PATH;
+            else
+                nvm_file_path = btfw_nvm_path;
+
+            goto download;
+        case HASTINGS_VER_2_0:
+           if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_2_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+               rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_2_0_PATH;
+           else
+               rampatch_file_path = btfw_rampatch_path;
+
+           if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_2_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+               nvm_file_path = HASTINGS_NVM_TLV_UART_2_0_PATH;
+           else
+               nvm_file_path = btfw_nvm_path;
+
+           goto download;
         case ROME_VER_2_1:
             rampatch_file_path = ROME_RAMPATCH_TLV_2_0_1_PATH;
             nvm_file_path = ROME_NVM_TLV_2_0_1_PATH;
