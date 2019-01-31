@@ -146,7 +146,7 @@ static int send_hci_cmd_sync(int dev, uint8_t *cmd, int len, uint8_t **event)
     if (!hci_event)
         return -ENOMEM;
 
-    err = read_hci_event(dev, (unsigned char *)hci_event, PS_EVENT_LEN);
+    err = read_new_hci_event(dev, (unsigned char *)hci_event, PS_EVENT_LEN);
     if (err > 0) {
         *event = hci_event;
     } else {
@@ -416,7 +416,7 @@ static int set_cntrlr_baud(int fd, int speed)
 
     nanosleep(&tm, NULL);
 
-    if (read_hci_event(fd, rsp, sizeof(rsp)) < 0)
+    if (read_new_hci_event(fd, rsp, sizeof(rsp)) < 0)
         return -ETIMEDOUT;
 
     return 0;
@@ -1134,7 +1134,7 @@ int ath3k_init(int fd, int speed, int init_speed, char *bdaddr, struct termios *
             goto failed;
         }
 
-        if (read_hci_event(fd, rsp, sizeof(rsp)) < 0) {
+        if (read_new_hci_event(fd, rsp, sizeof(rsp)) < 0) {
             ALOGI("Failed to set BD_ADDR\n");
             err = -ETIMEDOUT;
             goto failed;
@@ -1153,7 +1153,7 @@ int ath3k_init(int fd, int speed, int init_speed, char *bdaddr, struct termios *
     }
 
     nanosleep(&tm, NULL);
-    if (read_hci_event(fd, rsp, sizeof(rsp)) < 0) {
+    if (read_new_hci_event(fd, rsp, sizeof(rsp)) < 0) {
         err = -ETIMEDOUT;
         goto failed;
     }

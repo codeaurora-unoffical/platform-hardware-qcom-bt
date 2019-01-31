@@ -74,6 +74,15 @@
 #define PATCH_SOC_VER_OFFSET             (13)
 #define MAX_SIZE_PER_TLV_SEGMENT        (243)
 
+/* Unified VSC offset*/
+#define PATCH_PROD_ID_OFFSET_UNIFIED         (9)
+#define PATCH_PATCH_VER_OFFSET_UNIFIED       (13)
+#define PATCH_ROM_BUILD_VER_OFFSET_UNIFIED   (15)
+#define PATCH_SOC_VER_OFFSET_UNIFIED         (17)
+#define UNIFIED_HCI_CODE                     (0x01)
+#define UNIFIED_HCI_CC_MIN_LENGTH            (6)
+#define HCI_VS_WIPOWER_CMD_OPCODE            (0xFC1F)
+#define HCI_VS_GET_VER_CMD_OPCODE            (0xFC00)
 /* VS Opcode */
 #define HCI_PATCH_CMD_OCF                       (0)
 #define EDL_SET_BAUDRATE_CMD_OCF        (0x48)

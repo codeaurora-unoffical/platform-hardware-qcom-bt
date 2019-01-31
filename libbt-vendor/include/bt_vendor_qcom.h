@@ -120,6 +120,7 @@ struct bt_qcom_struct {
     bool enable_extldo;
 };
 extern struct bt_qcom_struct q;
+extern int unified_hci;
 
 #endif /* BT_VENDOR_QCOM_H */
 

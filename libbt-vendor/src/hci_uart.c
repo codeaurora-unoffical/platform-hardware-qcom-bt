@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include "bt_vendor_qcom.h"
 #include "hci_uart.h"
+#include "hw_rome.h"
 #include <string.h>
 
 /******************************************************************************
@@ -471,6 +472,83 @@ int read_hci_event(int fd, unsigned char* buf, int size)
 {
     int remain, r;
     int count = 0;
+    unsigned char wake_byte;
+    unsigned short int opcode;
+
+    if (size <= 0) {
+        ALOGE("Invalid size arguement!");
+        return -1;
+    }
+
+    ALOGI("%s: Wait for Command Compete Event from SOC", __FUNCTION__);
+
+    /* The first byte identifies the packet type. For HCI event packets, it
+     * should be 0x04, so we read until we get to the 0x04. */
+    while (1) {
+            r = read(fd, buf, 1);
+            if (r <= 0)
+                    return -1;
+            if (buf[0] == 0x04)
+                    break;
+            if (buf[0] == 0xFD) {
+                 ALOGI("%s: Got FD , responding with FC", __func__);
+                 wake_byte = 0xFC;
+                 write(fd, &wake_byte, 1);
+            }
+    }
+    count++;
+
+    /* The next two bytes are the event code and parameter total length. */
+    while (count < 3) {
+            r = read(fd, buf + count, 3 - count);
+            if (r <= 0)
+                return -1;
+            count += r;
+    }
+    /* Now we read the parameters. */
+    if (buf[2] < (size - 3))
+            remain = buf[2];
+    else
+            remain = size - 3;
+
+    while ((count - 3) < remain) {
+            r = read(fd, buf + count, remain - (count - 3));
+            if (r <= 0)
+                    return -1;
+            count += r;
+    }
+
+    if (unified_hci && (buf[EVENTCODE_OFFSET] == VSEVENT_CODE)) {
+         ALOGE("%s: Unexpected event recieved rather than CC", __func__);
+         return 0;
+    }
+
+    if (buf[1] == VSEVENT_CODE) {
+          /*Handle controller log function*/
+    } else if (buf[1] == EVT_CMD_COMPLETE) {
+      ALOGD("%s: Expected CC", __func__);
+      if (count > UNIFIED_HCI_CC_MIN_LENGTH) {
+        opcode = (buf[4] | (buf[5] << 8));
+        if (((HCI_VS_WIPOWER_CMD_OPCODE == opcode) && (UNIFIED_HCI_CODE == buf[6])) ||
+            ((HCI_VS_GET_VER_CMD_OPCODE == opcode) && (buf[7] == EDL_PATCH_VER_REQ_CMD))) {
+          unified_hci = 1;
+          ALOGI("HCI Unified command interface supported");
+        }
+      }
+      if (unified_hci) {
+        get_vs_hci_event(buf);
+       }
+    } else {
+      ALOGE("%s: Unexpected event : protocol byte: %d", __func__, buf[1]);
+       count = -1;
+    }
+    return count;
+}
+
+int read_new_hci_event(int fd, unsigned char* buf, int size)
+{
+    int remain, r;
+    int count = 0;
 
     if (size <= 0) {
         ALOGE("Invalid size arguement!");
@@ -510,6 +588,28 @@ int read_hci_event(int fd, unsigned char* buf, int size)
             count += r;
     }
     return count;
+}
+
+int read_cmd_compl_event(int fd, unsigned char* buf, int size)
+{
+     int tot_len = -1;
+     do {
+          tot_len = read_new_hci_event(fd, buf, size);
+          if (tot_len < 0) {
+               ALOGE("%s: Error while reading the hci event", __func__);
+               break;
+          }
+
+          if (buf[1] == EVT_CMD_COMPLETE) {
+               ALOGD("%s: Cmd Cmpl received for opcode %0x", __func__,
+                      (buf[4] | (buf[5] << 8)));
+               break;
+          } else {
+               ALOGE("%s: Unexpected event %0x received", __func__, buf[1]);
+          }
+     } while (buf[1] != EVT_CMD_COMPLETE);
+
+     return tot_len;
 }
 
 int userial_clock_operation(int fd, int cmd)

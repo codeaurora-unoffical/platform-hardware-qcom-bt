@@ -87,6 +87,8 @@
 
 #define BT_SCRIPT_PATH "/etc/bluetooth/init.msm.bt.sh"
 
+int unified_hci;
+
 static void wait_for_patch_download(bool is_ant_req);
 static bool is_debug_force_special_bytes(void);
 int connect_to_local_socket(char* name);
@@ -987,6 +989,7 @@ userial_open:
                 }
                 int (*fd_array)[] = (int (*)[]) param;
                 int idx, fd = -1, fd_filter = -1;
+	        unified_hci = 0;
                 ALOGI("bt-vendor : BT_VND_OP_USERIAL_OPEN");
                 switch(q.soc_type)
                 {
@@ -1267,6 +1270,7 @@ userial_open:
 #endif
         case BT_VND_OP_USERIAL_CLOSE:
             {
+                unified_hci = 0;
                 ALOGI("bt-vendor : BT_VND_OP_USERIAL_CLOSE soc_type: %d", q.soc_type);
                 switch(q.soc_type)
                 {
