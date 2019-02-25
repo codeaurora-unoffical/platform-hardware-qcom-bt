@@ -426,7 +426,7 @@ int read_vs_hci_event(int fd, unsigned char* buf, int size)
     /* The next two bytes are the event code and parameter total length. */
     while (count < 3) {
             r = read(fd, buf + count, 3 - count);
-            if ((r <= 0) || (buf[1] != 0xFF ) || (buf[1] != EVT_CMD_COMPLETE)) {
+            if ((r <= 0) || ((buf[1] != 0xFF) && (buf[1] != EVT_CMD_COMPLETE))) {
                 ALOGE("It is not VS event !! ret: %d, EVT: %d", r, buf[1]);
                 return -1;
             }
