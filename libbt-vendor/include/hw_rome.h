@@ -74,6 +74,15 @@
 #define PATCH_SOC_VER_OFFSET             (13)
 #define MAX_SIZE_PER_TLV_SEGMENT        (243)
 
+/* Unified VSC offset*/
+#define PATCH_PROD_ID_OFFSET_UNIFIED         (9)
+#define PATCH_PATCH_VER_OFFSET_UNIFIED       (13)
+#define PATCH_ROM_BUILD_VER_OFFSET_UNIFIED   (15)
+#define PATCH_SOC_VER_OFFSET_UNIFIED         (17)
+#define UNIFIED_HCI_CODE                     (0x01)
+#define UNIFIED_HCI_CC_MIN_LENGTH            (6)
+#define HCI_VS_WIPOWER_CMD_OPCODE            (0xFC1F)
+#define HCI_VS_GET_VER_CMD_OPCODE            (0xFC00)
 /* VS Opcode */
 #define HCI_PATCH_CMD_OCF                       (0)
 #define EDL_SET_BAUDRATE_CMD_OCF        (0x48)
@@ -190,6 +199,11 @@
 
 #define NAPLES_RAMPATCH_TLV_UART_1_0_PATH    "/lib/firmware/image/btfwnpla.tlv"
 #define NAPLES_NVM_TLV_UART_1_0_PATH         "/lib/firmware/image/btnvnpla.bin"
+
+#define HASTINGS_RAMPATCH_TLV_UART_1_0_PATH    "/lib/firmware/image/htbtfw10.tlv"
+#define HASTINGS_NVM_TLV_UART_1_0_PATH         "/lib/firmware/image/htnv10.bin"
+#define HASTINGS_RAMPATCH_TLV_UART_2_0_PATH    "/lib/firmware/image/htbtfw20.tlv"
+#define HASTINGS_NVM_TLV_UART_2_0_PATH         "/lib/firmware/image/htnv20.bin"
 #endif
 
 #define ROME_3_1_FW_SU  "bprm.cnss.3.1"
@@ -287,6 +301,8 @@ enum{
 
 enum{
     NAPLES_PATCH_VER_0100 = 0x0100,
+    HASTINGS_PATCH_VER_0100 = 0x0100,
+    HASTINGS_PATCH_VER_0200 = 0x0200,
     ROME_PATCH_VER_0100 = 0x0100,
     ROME_PATCH_VER_0101 = 0x0101,
     ROME_PATCH_VER_0200 = 0x0200,
@@ -302,6 +318,10 @@ enum{
     ROME_SOC_ID_23 = 0x00000023,
     ROME_SOC_ID_44 = 0x00000044,
     NAPLES_SOC_ID_15 = 0x00000015,
+    HASTINGS_SOC_ID_0100 = 0x00000100,
+    HASTINGS_SOC_ID_0101 = 0x00000101,
+    HASTINGS_SOC_ID_0110 = 0x00000110,
+    HASTINGS_SOC_ID_0200 = 0x00000200
 };
 
 enum{
@@ -314,8 +334,15 @@ enum{
     ROME_VER_3_2 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_44 ),
     TUFELLO_VER_1_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_13 ),
     TUFELLO_VER_1_1 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_23 ),
-    NAPLES_VER_1_0 = ((NAPLES_PATCH_VER_0100 << 16 ) | NAPLES_SOC_ID_15 )
+    NAPLES_VER_1_0 = ((NAPLES_PATCH_VER_0100 << 16 ) | NAPLES_SOC_ID_15 ),
+    HASTINGS_VER_1_0 = ((HASTINGS_PATCH_VER_0100 << 16 ) | HASTINGS_SOC_ID_0100),
+    HASTINGS_VER_1_0_1 = ((HASTINGS_PATCH_VER_0100 << 16 ) | HASTINGS_SOC_ID_0101),
+    HASTINGS_VER_1_1 = ((HASTINGS_PATCH_VER_0100 << 16 ) | HASTINGS_SOC_ID_0110),
+    HASTINGS_VER_2_0 = ((HASTINGS_PATCH_VER_0200 << 16 ) | HASTINGS_SOC_ID_0200)
 };
+
+#define IS_HASTINGS_SOC(v) (((v) == HASTINGS_VER_1_0) || ((v) == HASTINGS_VER_1_0_1) || ((v) == HASTINGS_VER_1_1) || ((v) == HASTINGS_VER_2_0))
+
 
 //declarations
 int rome_soc_init(int fd, char *bdaddr);

@@ -265,4 +265,7 @@ int userial_tcio_baud_to_int(uint32_t baud);
 *******************************************************************************/
 int read_hci_event(int fd, unsigned char* buf, int size);
 
+int read_new_hci_event(int fd, unsigned char* buf, int size);
+int read_cmd_compl_event(int fd, unsigned char* buf, int size);
+
 #endif /* HCI_UART_H */

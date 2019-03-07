@@ -144,7 +144,7 @@ int do_write(int fd, unsigned char *buf,int len)
 int get_vs_hci_event(unsigned char *rsp)
 {
     int err = 0;
-    unsigned char paramlen = 0;
+    int paramlen = 0;
     unsigned char EMBEDDED_MODE_CHECK = 0x02;
     FILE *btversionfile = 0;
     unsigned int soc_id = 0;
@@ -153,6 +153,13 @@ int get_vs_hci_event(unsigned char *rsp)
     char build_label[255];
     int build_lbl_len;
     unsigned short buildversion = 0;
+    unsigned int opcode = 0;
+    unsigned char subOpcode = 0;
+    unsigned int ocf = 0;
+    unsigned int ogf = 0;
+    unsigned char status = 0;
+    bool ret  = false;
+    unsigned char tu8;
 
     if( (rsp[EVENTCODE_OFFSET] == VSEVENT_CODE) || (rsp[EVENTCODE_OFFSET] == EVT_CMD_COMPLETE))
         ALOGI("%s: Received HCI-Vendor Specific event", __FUNCTION__);
@@ -162,64 +169,103 @@ int get_vs_hci_event(unsigned char *rsp)
         goto failed;
     }
     paramlen = rsp[EVT_PLEN];
-    ALOGI("%s: Event Opcode: 0x%x", __FUNCTION__, rsp[EVENTCODE_OFFSET]);
-    ALOGI("%s: Parameter Length: 0x%x", __FUNCTION__, rsp[EVT_PLEN]);
-    ALOGI("%s: Command response: 0x%x", __FUNCTION__, rsp[CMD_RSP_OFFSET]);
-    ALOGI("%s: Response type   : 0x%x", __FUNCTION__, rsp[RSP_TYPE_OFFSET]);
+    ALOGI("%s: Parameter Length: 0x%x", __func__, paramlen);
+    if (!unified_hci) {
+      ocf = rsp[CMD_RSP_OFFSET];
+      subOpcode = rsp[RSP_TYPE_OFFSET];
+      status = rsp[CMD_STATUS_OFFSET];
+      ALOGI("%s: Command response: 0x%x", __func__, ocf);
+      ALOGI("%s: Response type   : 0x%x", __func__, subOpcode);
+    } else {
+      opcode = rsp[5]<<8 | rsp[4];
+      ocf = opcode & 0x03ff;
+      ogf = opcode >> 10;
+      status = rsp[6];
+      subOpcode = rsp[7];
+      ALOGI("%s: Opcode: 0x%x", __func__, opcode);
+      ALOGI("%s: ocf: 0x%x", __func__, ocf);
+      ALOGI("%s: ogf: 0x%x", __func__, ogf);
+      ALOGI("%s: Status: 0x%x", __func__, status);
+      ALOGI("%s: Sub-Opcode: 0x%x", __func__, subOpcode);
+    }
 
     /* Check the status of the operation */
-    switch ( rsp[CMD_RSP_OFFSET] )
+    switch ( ocf )
     {
         case EDL_CMD_REQ_RES_EVT:
         ALOGI("%s: Command Request Response", __FUNCTION__);
-        switch(rsp[RSP_TYPE_OFFSET])
+        switch(subOpcode)
         {
             case EDL_PATCH_VER_RES_EVT:
             case EDL_APP_VER_RES_EVT:
-                productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET +3] << 24 |
-                                    rsp[PATCH_PROD_ID_OFFSET+2] << 16 |
-                                    rsp[PATCH_PROD_ID_OFFSET+1] << 8 |
-                                    rsp[PATCH_PROD_ID_OFFSET]  );
-                ALOGI("\t Current Product ID\t\t: 0x%08x", productid);
+                 if (!unified_hci) {
+                   productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET + 3] << 24 |
+                                             rsp[PATCH_PROD_ID_OFFSET + 2] << 16 |
+                                             rsp[PATCH_PROD_ID_OFFSET + 1] << 8 |
+                                             rsp[PATCH_PROD_ID_OFFSET]  );
+                   patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET + 1] << 8 |
+                                                  rsp[PATCH_PATCH_VER_OFFSET] );
+                   buildversion = (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET + 1] << 8 |
+                               rsp[PATCH_ROM_BUILD_VER_OFFSET] );
 
-                /* Patch Version indicates FW patch version */
-                patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET + 1] << 8 |
-                                       rsp[PATCH_PATCH_VER_OFFSET] );
-                ALOGI("\t Current Patch Version\t\t: 0x%04x", patchversion);
+                   ALOGI("\t Current Product ID\t\t: 0x%08x", productid);
+                   ALOGI("\t Current Patch Version\t\t: 0x%04x", patchversion);
+                   ALOGI("\t Current ROM Build Version\t: 0x%04x", buildversion);
 
-                /* ROM Build Version indicates ROM build version like 1.0/1.1/2.0 */
-                buildversion = (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET + 1] << 8 |
-                                       rsp[PATCH_ROM_BUILD_VER_OFFSET] );
-                ALOGI("\t Current ROM Build Version\t: 0x%04x", buildversion);
+                   if (paramlen - 10) {
+                     soc_id = (unsigned int)(rsp[PATCH_SOC_VER_OFFSET + 3] << 24 |
+                                            rsp[PATCH_SOC_VER_OFFSET + 2] << 16 |
+                                            rsp[PATCH_SOC_VER_OFFSET + 1] << 8 |
+                                            rsp[PATCH_SOC_VER_OFFSET] );
+                     ALOGI("\t Current SOC Version\t\t: 0x%08x", soc_id);
+                   }
+                 } else {
+                   productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET_UNIFIED + 3] << 24 |
+                                             rsp[PATCH_PROD_ID_OFFSET_UNIFIED + 2] << 16 |
+                                             rsp[PATCH_PROD_ID_OFFSET_UNIFIED + 1] << 8 |
+                                             rsp[PATCH_PROD_ID_OFFSET_UNIFIED]  );
+                   ALOGI("\t unified Current Product ID\t\t: 0x%08x", productid);
 
-                /* In case rome 1.0/1.1, there is no SOC ID version available */
-                if (paramlen - 10)
-                {
-                    soc_id = (unsigned int)(rsp[PATCH_SOC_VER_OFFSET +3] << 24 |
-                                     rsp[PATCH_SOC_VER_OFFSET+2] << 16 |
-                                     rsp[PATCH_SOC_VER_OFFSET+1] << 8 |
-                                     rsp[PATCH_SOC_VER_OFFSET]  );
-                    ALOGI("\t Current SOC Version\t\t: 0x%08x", soc_id);
-                }
+                   /* Patch Version indicates FW patch version */
+                   patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET_UNIFIED + 1] << 8 |
+                                                        rsp[PATCH_PATCH_VER_OFFSET_UNIFIED] );
+                   ALOGI("\t unified Current Patch Version\t\t: 0x%04x", patchversion);
 
-                if (NULL != (btversionfile = fopen(BT_VERSION_FILEPATH, "wb"))) {
-                    fprintf(btversionfile, "Bluetooth Controller Product ID    : 0x%08x\n", productid);
-                    fprintf(btversionfile, "Bluetooth Controller Patch Version : 0x%04x\n", patchversion);
-                    fprintf(btversionfile, "Bluetooth Controller Build Version : 0x%04x\n", buildversion);
-                    fprintf(btversionfile, "Bluetooth Controller SOC Version   : 0x%08x\n", soc_id);
-                    fclose(btversionfile);
-                }else {
-                    ALOGI("Failed to dump SOC version info. Errno:%d", errno);
-                }
+                   /* ROM Build Version indicates ROM build version like 1.0/1.1/2.0 */
+                   buildversion =
+                         (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET_UNIFIED + 1] << 8 |
+                               rsp[PATCH_ROM_BUILD_VER_OFFSET_UNIFIED] );
+                   ALOGI("\t unified Current ROM Build Version\t: 0x%04x", buildversion);
+
+                   if ((paramlen - 14) > 0) {
+                     soc_id =
+                           (unsigned int)(rsp[PATCH_SOC_VER_OFFSET_UNIFIED + 3] << 24 |
+                                           rsp[PATCH_SOC_VER_OFFSET_UNIFIED + 2] << 16 |
+                                           rsp[PATCH_SOC_VER_OFFSET_UNIFIED + 1] << 8 |
+                                           rsp[PATCH_SOC_VER_OFFSET_UNIFIED]  );
+                     ALOGI("\t unified Current SOC Version\t\t: 0x%08x", soc_id);
+                   }
+                 }
+                 if (NULL != (btversionfile = fopen(BT_VERSION_FILEPATH, "wb"))) {
+                   fprintf(btversionfile, "Bluetooth Controller Product ID    : 0x%08x\n", productid);
+                   fprintf(btversionfile, "Bluetooth Controller Patch Version : 0x%04x\n", patchversion);
+                   fprintf(btversionfile, "Bluetooth Controller Build Version : 0x%04x\n", buildversion);
+                   fprintf(btversionfile, "Bluetooth Controller SOC Version   : 0x%08x\n", soc_id);
+                   fclose(btversionfile);
+                 } else {
+                   ALOGE("Failed to dump SOC version info. Errno:%d", errno);
+                 }
                 /* Rome Chipset Version can be decided by Patch version and SOC version,
                 Upper 2 bytes will be used for Patch version and Lower 2 bytes will be
                 used for SOC as combination for BT host driver */
                 chipset_ver = (buildversion << 16) |(soc_id & 0x0000ffff);
 
                 break;
+            case EDL_PATCH_TLV_REQ_CMD:
             case EDL_TVL_DNLD_RES_EVT:
             case EDL_CMD_EXE_STATUS_EVT:
-                switch (err = rsp[CMD_STATUS_OFFSET])
+                err = status;
+                switch (err)
                     {
                     case HCI_CMD_SUCCESS:
                         ALOGI("%s: Download Packet successfully!", __FUNCTION__);
@@ -246,10 +292,17 @@ int get_vs_hci_event(unsigned char *rsp)
                         break;
                     }
             break;
+            case EDL_GET_BUILD_INFO :
             case HCI_VS_GET_BUILD_VER_EVT:
-                build_lbl_len = rsp[5];
-                memcpy (build_label, &rsp[6], build_lbl_len);
-                *(build_label+build_lbl_len) = '\0';
+               if (!unified_hci) {
+                  build_lbl_len = rsp[5];
+                  memcpy (build_label, &rsp[6], build_lbl_len);
+               } else {
+                    build_lbl_len = rsp[8];
+                    memcpy (build_label, &rsp[9], build_lbl_len);
+               }
+
+                 *(build_label+build_lbl_len) = '\0';
 
                 ALOGI("BT SoC FW SU Build info: %s, %d", build_label, build_lbl_len);
                 if (NULL != (btversionfile = fopen(BT_VERSION_FILEPATH, "a+b"))) {
@@ -266,15 +319,18 @@ int get_vs_hci_event(unsigned char *rsp)
             ALOGI("%s: NVM Access Code!!!", __FUNCTION__);
             err = HCI_CMD_SUCCESS;
             break;
+
+        case EDL_SET_BAUDRATE_CMD_OCF:
         case EDL_SET_BAUDRATE_RSP_EVT:
-            /* Rome 1.1 has bug with the response, so it should ignore it. */
-            if (rsp[BAUDRATE_RSP_STATUS_OFFSET] != BAUDRATE_CHANGE_SUCCESS)
-            {
-                ALOGE("%s: Set Baudrate request failed - 0x%x", __FUNCTION__,
-                    rsp[CMD_STATUS_OFFSET]);
-                err = -1;
-            }
-            break;
+          tu8 = unified_hci ? status : rsp[BAUDRATE_RSP_STATUS_OFFSET];
+             /* Rome 1.1 has bug with the response, so it should ignore it. */
+          if (tu8 != BAUDRATE_CHANGE_SUCCESS)
+          {
+            ALOGE("%s: Set Baudrate request failed - 0x%x", __FUNCTION__,
+                rsp[CMD_STATUS_OFFSET]);
+            err = -1;
+          }
+          break;
        case EDL_WIP_QUERY_CHARGING_STATUS_EVT:
             /* Query charging command has below return values
             0 - in embedded mode not charging
@@ -299,15 +355,16 @@ int get_vs_hci_event(unsigned char *rsp)
             }
             break;
         case HCI_VS_GET_ADDON_FEATURES_EVENT:
-            if ((rsp[4] & ADDON_FEATURES_EVT_WIPOWER_MASK))
+            tu8 = unified_hci ? rsp[11]: rsp[4];
+            if ((tu8 & ADDON_FEATURES_EVT_WIPOWER_MASK))
             {
-               ALOGD("%s: WiPower feature supported!!", __FUNCTION__);
+               ALOGI("%s: WiPower feature supported!!", __FUNCTION__);
                property_set_bt("persist.bluetooth.a4wp", "true");
             }
             break;
         case HCI_VS_STRAY_EVT:
             /* WAR to handle stray Power Apply EVT during patch download */
-            ALOGD("%s: Stray HCI VS EVENT", __FUNCTION__);
+            ALOGI("%s: Stray HCI VS EVENT", __FUNCTION__);
             if (patch_dnld_pending && dnld_fd != -1)
             {
                 unsigned char rsp[HCI_MAX_EVENT_SIZE];
@@ -338,6 +395,8 @@ int read_vs_hci_event(int fd, unsigned char* buf, int size)
 {
     int remain, r;
     int count = 0, i;
+    unsigned char wake_byte;
+    unsigned short int opcode;
 
     if (size <= 0) {
         ALOGE("Invalid size arguement!");
@@ -355,13 +414,19 @@ int read_vs_hci_event(int fd, unsigned char* buf, int size)
                     return -1;
             if (buf[0] == 0x04)
                     break;
+
+            if (buf[0] == 0xFD) {
+                 ALOGI("%s: Got FD , responding with FC", __func__);
+                 wake_byte = 0xFC;
+                 write(fd, &wake_byte, 1);
+            }
     }
     count++;
 
     /* The next two bytes are the event code and parameter total length. */
     while (count < 3) {
             r = read(fd, buf + count, 3 - count);
-            if ((r <= 0) || (buf[1] != 0xFF )) {
+            if ((r <= 0) || (buf[1] != 0xFF ) || (buf[1] != EVT_CMD_COMPLETE)) {
                 ALOGE("It is not VS event !! ret: %d, EVT: %d", r, buf[1]);
                 return -1;
             }
@@ -380,6 +445,27 @@ int read_vs_hci_event(int fd, unsigned char* buf, int size)
                     return -1;
             count += r;
     }
+
+     if (buf[1] == VSEVENT_CODE) {
+         ALOGV("VSC Event! good");
+     } else if (buf[1] == EVT_CMD_COMPLETE) {
+       ALOGI("%s: Expected CC", __func__);
+       if (count > UNIFIED_HCI_CC_MIN_LENGTH) {
+         opcode = (buf[4] | (buf[5] << 8));
+         if (((HCI_VS_WIPOWER_CMD_OPCODE == opcode) && (UNIFIED_HCI_CODE == buf[6])) ||
+             ((HCI_VS_GET_VER_CMD_OPCODE == opcode) && (buf[7] == EDL_PATCH_VER_REQ_CMD))) {
+           unified_hci = 1;
+           ALOGI("HCI Unified command interface supported");
+         }
+       }
+       if (unified_hci) {
+         return (get_vs_hci_event(buf) == HCI_CMD_SUCCESS) ? count : -1;
+       }
+     } else {
+       ALOGI("%s: Unexpected event! : opcode: %d", __func__, buf[1]);
+       count = -1;
+       return count;
+     }
 
      /* Check if the set patch command is successful or not */
     if(get_vs_hci_event(buf) != HCI_CMD_SUCCESS)
@@ -421,6 +507,7 @@ failed:
 int hci_send_vs_cmd(int fd, unsigned char *cmd, unsigned char *rsp, int size)
 {
     int ret = 0;
+    int rv;
 
     /* Send the HCI command packet to UART for transmission */
     ret = do_write(fd, cmd, size);
@@ -430,13 +517,24 @@ int hci_send_vs_cmd(int fd, unsigned char *cmd, unsigned char *rsp, int size)
     }
 
     if (wait_vsc_evt) {
-        /* Check for response from the Controller */
-        if (read_vs_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE) < 0) {
-           ret = -ETIMEDOUT;
-           ALOGI("%s: Failed to get HCI-VS Event from SOC", __FUNCTION__);
-           goto failed;
-        }
-        ALOGI("%s: Received HCI-Vendor Specific Event from SOC", __FUNCTION__);
+      /* Check for response from the Controller */
+      if (!unified_hci) {
+       if (read_vs_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE) < 0) {
+        ret = -ETIMEDOUT;
+        ALOGI("%s: Failed to get ReadVsHciEvent Event from SOC", __func__);
+        goto failed;
+       }
+        ALOGV("%s: Received HCI-Vendor Specific Event from SOC", __func__);
+      }
+      else
+      {
+       if (read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE) < 0) {
+        ret = -ETIMEDOUT;
+        ALOGI("%s: Failed to get ReadHciEvent Event from SOC", __func__);
+        goto failed;
+       }
+        ALOGV("%s: Received HCI-Vendor Specific Event from SOC", __func__);
+      }
     }
 
 failed:
@@ -838,6 +936,41 @@ error:
     return err;
 }
 
+
+void update_new_nvm_format(tlv_nvm_hdr *nvm)
+{
+  int enable_ibs = 1;
+  uint8_t *nvm_byte_ptr = (uint8_t *)nvm;
+
+  if (!nvm)
+    return;
+
+  nvm_byte_ptr += sizeof(tlv_nvm_hdr);
+  /* Update Tag#17: HCI UART Settings */
+  if (nvm->tag_id == 17) {
+    uint8_t baudrate = BAUDRATE_3000000;
+
+    ALOGI("%s: baudrate %02x", __func__, baudrate);
+
+    /* Byte#1: UART baudrate */
+    *(nvm_byte_ptr + 1) = baudrate;
+  }
+
+  /* Update Tag#27: SIBS Settings */
+  if (nvm->tag_id == 27) {
+    if (!enable_ibs) {
+      /* TxP Sleep Mode: Disable */
+      *(nvm_byte_ptr + 1) &= ~0x01;
+      ALOGI("%s: SIBS Disable", __func__);
+    } else {
+      /* TxP Sleep Mode-1:UART_SIBS, 2:USB_SUSPEND, 3: GPIO_OOB, 4: UART_HWIBS */
+      *(nvm_byte_ptr + 1) |= 0x01;
+      ALOGI("%s: SIBS Enable", __func__);
+    }
+  }
+
+}
+
 int rome_get_tlv_file(char *file_path)
 {
     FILE * pFile;
@@ -936,6 +1069,10 @@ int rome_get_tlv_file(char *file_path)
                     *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
             }
 
+            if (IS_HASTINGS_SOC(chipset_ver)) {
+                update_new_nvm_format(nvm_ptr);
+            }
+
             for(i =0;(i<nvm_ptr->tag_len && (i*3 + 2) <PRINT_BUF_SIZE);i++)
                 snprintf((char *) data_buf, PRINT_BUF_SIZE, "%s%.02x ", (char *)data_buf, *(nvm_byte_ptr + i));
 
@@ -982,14 +1119,16 @@ int rome_tlv_dnld_segment(int fd, int index, int seg_size, unsigned char wait_cc
         return err;
     }
 
-    if(wait_cc_evt) {
-        /* Initialize the RSP packet everytime to 0 */
-        memset(rsp, 0x0, HCI_MAX_EVENT_SIZE);
-        err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
-        if ( err < 0) {
-            ALOGE("%s: Failed to downlaod patch segment: %d!",  __FUNCTION__, index);
-            return err;
-        }
+    if (!unified_hci) {
+      if(wait_cc_evt) {
+          /* Initialize the RSP packet everytime to 0 */
+          memset(rsp, 0x0, HCI_MAX_EVENT_SIZE);
+          err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+          if ( err < 0) {
+              ALOGE("%s: Failed to downlaod patch segment: %d!",  __FUNCTION__, index);
+              return err;
+          }
+      }
     }
 
     ALOGI("%s: Successfully downloaded patch segment: %d", __FUNCTION__, index);
@@ -1083,6 +1222,12 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
             wait_vsc_evt = remain_size ? TRUE: FALSE;
         }
     } else if ((chipset_ver == NAPLES_VER_1_0) && (gTlv_type == TLV_TYPE_PATCH)) {
+        if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
+            wait_cc_evt = remain_size ? FALSE: TRUE;
+        } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
+            wait_vsc_evt = remain_size ? TRUE: FALSE;
+        }
+    } else if (IS_HASTINGS_SOC(chipset_ver) && (gTlv_type == TLV_TYPE_PATCH)) {
         if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
             wait_cc_evt = remain_size ? FALSE: TRUE;
         } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
@@ -1444,11 +1589,14 @@ int rome_patch_ver_req(int fd)
     }
 
     /* Read Command Complete Event - This is extra routine for ROME 1.0. From ROM 2.0, it should be removed. */
-    err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
-    if ( err < 0) {
-        ALOGE("%s: Failed to get patch version(s)", __FUNCTION__);
-        goto error;
-    }
+     if (!unified_hci) {
+         err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+         if ( err < 0) {
+             ALOGE("%s: Failed to get patch version(s)", __FUNCTION__);
+             goto error;
+         }
+     }
+
 error:
     return err;
 
@@ -1474,10 +1622,12 @@ int rome_get_build_info_req(int fd)
         goto error;
     }
 
-    err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
-    if ( err < 0) {
-        ALOGE("%s: Failed to get build info", __FUNCTION__);
-        goto error;
+    if (!unified_hci) {
+         err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+         if ( err < 0) {
+             ALOGE("%s: Failed to get build info", __FUNCTION__);
+             goto error;
+         }
     }
 error:
     return err;
@@ -1528,13 +1678,14 @@ int rome_set_baudrate_req(int fd)
         return err;
     }
 
-    /* Check for response from the Controller */
-    if ((err =read_vs_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE)) < 0) {
-            ALOGE("%s: Failed to get HCI-VS Event from SOC", __FUNCTION__);
-            goto error;
-    }
-
-    ALOGI("%s: Received HCI-Vendor Specific Event from SOC", __FUNCTION__);
+     if (!unified_hci) {
+          /* Check for response from the Controller */
+          if ((err =read_vs_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE)) < 0) {
+               ALOGE("%s: Failed to get HCI-VS Event from SOC", __FUNCTION__);
+               goto error;
+          }
+          ALOGI("%s: Received HCI-Vendor Specific Event from SOC", __FUNCTION__);
+     }
 
     /* Wait for command complete event */
     err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
@@ -1634,7 +1785,7 @@ int rome_hci_reset(int fd)
     }
 
     /* Wait for command complete event */
-    err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+    err = read_cmd_compl_event(fd, rsp, HCI_MAX_EVENT_SIZE);
     if ( err < 0) {
         ALOGE("%s: Failed to set patch info on Controller", __FUNCTION__);
         goto error;
@@ -1719,10 +1870,12 @@ int addon_feature_req(int fd)
         goto error;
     }
 
-    err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
-    if (err < 0) {
-        ALOGE("%s: Failed to get feature request", __FUNCTION__);
-        goto error;
+    if (!unified_hci) {
+        err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+        if (err < 0) {
+           ALOGE("%s: Failed to get feature request", __FUNCTION__);
+           goto error;
+        }
     }
 error:
     return err;
@@ -1818,9 +1971,12 @@ void enable_controller_log (int fd, unsigned char wait_for_evt)
    /*Ignore hci_event if wait_for_evt is true*/
    if (wait_for_evt)
        goto end;
-   ret = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
-   if (ret < 0) {
-       ALOGE("%s: Failed to get CC for enable SoC log", __FUNCTION__);
+
+   if (!unified_hci) {
+      ret = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+      if (ret < 0) {
+          ALOGE("%s: Failed to get CC for enable SoC log", __FUNCTION__);
+      }
    }
 end:
    wait_vsc_evt = TRUE;
@@ -1981,6 +2137,32 @@ int rome_soc_init(int fd, char *bdaddr)
             //rome_ver = ROME_VER_3_2;	// SET to ROME 3.2 as the patch downloading workflow is same as Rome 3.2
             //ALOGD(" set rome_ver to ROME_VER_3_2\n");
             goto download;
+        case HASTINGS_VER_1_0:
+        case HASTINGS_VER_1_0_1:
+        case HASTINGS_VER_1_1:
+            if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+                rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_1_0_PATH;
+            else
+                rampatch_file_path = btfw_rampatch_path;
+
+            if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+                nvm_file_path = HASTINGS_NVM_TLV_UART_1_0_PATH;
+            else
+                nvm_file_path = btfw_nvm_path;
+
+            goto download;
+        case HASTINGS_VER_2_0:
+           if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_2_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+               rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_2_0_PATH;
+           else
+               rampatch_file_path = btfw_rampatch_path;
+
+           if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_2_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+               nvm_file_path = HASTINGS_NVM_TLV_UART_2_0_PATH;
+           else
+               nvm_file_path = btfw_nvm_path;
+
+           goto download;
         case ROME_VER_2_1:
             rampatch_file_path = ROME_RAMPATCH_TLV_2_0_1_PATH;
             nvm_file_path = ROME_NVM_TLV_2_0_1_PATH;
