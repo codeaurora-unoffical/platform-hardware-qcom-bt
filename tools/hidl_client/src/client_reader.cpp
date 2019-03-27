@@ -138,7 +138,9 @@ void *process_tool_data(void *arg) {
                 ALOGE("%s: Unsupported packet type: %d", __func__, packet_type);
         }
     } while (1);
-    free(data);
+    delete data;
+    data = NULL;
+
     return NULL;
 }
 
