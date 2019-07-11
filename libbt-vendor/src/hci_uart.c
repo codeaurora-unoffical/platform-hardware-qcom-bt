@@ -590,11 +590,62 @@ int read_new_hci_event(int fd, unsigned char* buf, int size)
     return count;
 }
 
+int read_new_hci_event_sibs(int fd, unsigned char* buf, int size)
+{
+    int remain, r;
+    int count = 0;
+    unsigned char wake_byte;
+
+    if (size <= 0) {
+        ALOGE("Invalid size arguement!");
+        return -1;
+    }
+
+    ALOGI("%s: Wait for Command Compete Event from SOC", __FUNCTION__);
+
+    /* The first byte identifies the packet type. For HCI event packets, it
+     * should be 0x04, so we read until we get to the 0x04. */
+    while (1) {
+            r = read(fd, buf, 1);
+            if (r <= 0)
+                    return -1;
+            if (buf[0] == 0x04)
+                    break;
+            if (buf[0] == 0xFD) {
+                 ALOGI("%s: Got FD , responding with FC", __func__);
+                 wake_byte = 0xFC;
+                 write(fd, &wake_byte, 1);
+            }
+    }
+    count++;
+
+    /* The next two bytes are the event code and parameter total length. */
+    while (count < 3) {
+            r = read(fd, buf + count, 3 - count);
+            if (r <= 0)
+                return -1;
+            count += r;
+    }
+    /* Now we read the parameters. */
+    if (buf[2] < (size - 3))
+            remain = buf[2];
+    else
+            remain = size - 3;
+
+    while ((count - 3) < remain) {
+            r = read(fd, buf + count, remain - (count - 3));
+            if (r <= 0)
+                    return -1;
+            count += r;
+    }
+    return count;
+}
+
 int read_cmd_compl_event(int fd, unsigned char* buf, int size)
 {
      int tot_len = -1;
      do {
-          tot_len = read_new_hci_event(fd, buf, size);
+          tot_len = read_new_hci_event_sibs(fd, buf, size);
           if (tot_len < 0) {
                ALOGE("%s: Error while reading the hci event", __func__);
                break;
