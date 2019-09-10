@@ -234,6 +234,7 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
     uint8_t data_bits;
     uint16_t parity;
     uint8_t stop_bits;
+    int ret;
 
     vnd_userial.fd = -1;
 
@@ -286,24 +287,30 @@ int userial_vendor_open(tUSERIAL_CFG *p_cfg)
             strerror(errno), errno);
         return -1;
     }
+    ALOGI("%s: open(%s, ...) = %d", __func__, vnd_userial.port_name, vnd_userial.fd);
 
-    tcflush(vnd_userial.fd, TCIOFLUSH);
+    ret = tcflush(vnd_userial.fd, TCIOFLUSH);
+    ALOGI("%s: tcflush(%d, ...) = %d", __func__, vnd_userial.fd, ret);
 
-    tcgetattr(vnd_userial.fd, &vnd_userial.termios);
+    ret = tcgetattr(vnd_userial.fd, &vnd_userial.termios);
+    ALOGI("%s: tcgetattr(%d, ...) = %d", __func__, vnd_userial.fd, ret);
     cfmakeraw(&vnd_userial.termios);
 
     /* Set UART Control Modes */
     vnd_userial.termios.c_cflag |= CLOCAL;
     vnd_userial.termios.c_cflag |= (CRTSCTS | stop_bits);
 
-    tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
+    ret = tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
+    ALOGI("%s: tcsetattr(%d, ...) = %d", __func__, vnd_userial.fd, ret);
 
     /* set input/output baudrate */
     cfsetospeed(&vnd_userial.termios, baud);
     cfsetispeed(&vnd_userial.termios, baud);
-    tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
+    ret = tcsetattr(vnd_userial.fd, TCSANOW, &vnd_userial.termios);
+    ALOGI("%s: 2nd tcsetattr(%d, ...) = %d", __func__, vnd_userial.fd, ret);
 
-    tcflush(vnd_userial.fd, TCIOFLUSH);
+    ret = tcflush(vnd_userial.fd, TCIOFLUSH);
+    ALOGI("%s: 2nd tcflush(%d, ...) = %d", __func__, vnd_userial.fd, ret);
 
 #if (BT_WAKE_VIA_USERIAL_IOCTL==TRUE)
     userial_ioctl_init_bt_wake(vnd_userial.fd);

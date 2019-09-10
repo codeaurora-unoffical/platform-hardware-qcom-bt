@@ -1034,6 +1034,7 @@ userial_open:
                     case BT_SOC_ROME:
                         {
                             wait_for_patch_download(is_ant_req);
+                            ALOGI("USERIAL_OP_CLK_ON=0x%x", USERIAL_OP_CLK_ON);
                             property_get_bt("ro.bluetooth.emb_wp_mode", emb_wp_mode, false);
                             if (!is_soc_initialized()) {
                                 char* dlnd_inprog = is_ant_req ? "ant" : "bt";
