@@ -353,13 +353,15 @@ void stop_hci_filter() {
        char value[PROPERTY_VALUE_MAX] = {'\0'};
        int retval, filter_ctrl, i;
        char stop_val = STOP_WCNSS_FILTER;
-       int soc_type = BT_SOC_DEFAULT;
+       int soc_type = q.soc_type;
 
        ALOGV("%s: Entry ", __func__);
 
        property_get_bt("wc_transport.hci_filter_status", value, "0");
        if (strcmp(value, "0") == 0) {
            ALOGI("%s: hci_filter has been stopped already", __func__);
+       } else if (BT_SOC_ROME == soc_type) {
+           ALOGI("%s: BT_SOC_ROME do not have wcnssfilter_ctrl channel", __func__);
        }
        else {
            filter_ctrl = connect_to_local_socket(CTRL_SOCK);

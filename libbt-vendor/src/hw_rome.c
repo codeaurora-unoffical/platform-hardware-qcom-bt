@@ -363,6 +363,13 @@ int get_vs_hci_event(unsigned char *rsp)
             }
             break;
         case HCI_VS_STRAY_EVT:
+	    if (IS_HASTINGS_SOC(chipset_ver)) {
+		    if (unified_hci) {
+			    err = status ? -1 : 0;
+			    ALOGI("%s: CCE for controller log, status = 0x%x, subOpcode = 0x%x", __func__, status, subOpcode);
+		    }
+		    break;
+	    }
             /* WAR to handle stray Power Apply EVT during patch download */
             ALOGI("%s: Stray HCI VS EVENT", __FUNCTION__);
             if (patch_dnld_pending && dnld_fd != -1)
@@ -1790,6 +1797,7 @@ int rome_hci_reset(int fd)
         ALOGE("%s: Failed to set patch info on Controller", __FUNCTION__);
         goto error;
     }
+    err = 0;
 
 error:
     return err;
@@ -1972,7 +1980,7 @@ void enable_controller_log (int fd, unsigned char wait_for_evt)
    if (wait_for_evt)
        goto end;
 
-   if (!unified_hci) {
+   if (!unified_hci || IS_HASTINGS_SOC(chipset_ver)) {
       ret = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
       if (ret < 0) {
           ALOGE("%s: Failed to get CC for enable SoC log", __FUNCTION__);
@@ -2238,5 +2246,6 @@ download:
 
 error:
     dnld_fd = -1;
+    ALOGI("Exit %s : unified_hci = %d, wait_vsc_evt = %d, err = %d", __func__, unified_hci, wait_vsc_evt, err);
     return err;
 }
