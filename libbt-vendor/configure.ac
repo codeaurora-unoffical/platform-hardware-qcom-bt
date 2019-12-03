@@ -59,17 +59,14 @@ AC_SUBST([CFLAGS])
 AC_SUBST([CPPFLAGS])
 AC_SUBST([CC])
 
-AC_ARG_ENABLE(target,
-  [AS_HELP_STRING([--enable-target=TARGET], [Specify the target product to build])],
-  [TARGET=$enableval],
-  [TARGET=none]
-)
+AC_ARG_ENABLE([rome],
+        [  --enable-rome Enable Rome],
+        [case "${enableval}" in
+            yes) rome=true ;;
+            no)  rome=false ;;
+            *) AC_MSG_ERROR([bad value ${enableval} for --enable-rome]) ;;
+        esac],[rome=false])
 
-AC_ARG_ENABLE(rome,
-  [AS_HELP_STRING([--enable-rome=ROME], [Specify the rome product to build])],
-  [ROME=$enableval],
-  [ROME=none]
-)
 
 AC_ARG_ENABLE([pronto],
         [  --enable-pronto Enable Pronto],
@@ -79,18 +76,26 @@ AC_ARG_ENABLE([pronto],
             *) AC_MSG_ERROR([bad value ${enableval} for --enable-pronto]) ;;
         esac],[pronto=false])
 
+
 AC_ARG_ENABLE([som],
-        [  --enable-som Enable Rome or Naples],
+        [  --enable-som Enable Naples],
         [case "${enableval}" in
             yes) som=true ;;
             no)  som=false ;;
             *) AC_MSG_ERROR([bad value ${enableval} for --enable-som]) ;;
         esac],[som=false])
 
-AM_CONDITIONAL([MDM_ROME], [test "x$TARGET" = "xmdm9607" -o "x$TARGET" = "xmdm9635" -o "x$TARGET" = "xmdm9640" -o "x$TARGET" = "xmdm9650" -o "x$TARGET" = "xapq8096" -o "x$TARGET" = "xsdx20" -o "x$ROME" = "xqsap" -o "x$ROME" = "xrobot-rome" -o "x$TARGET" = "xsdxpoorwills" -o "x$TARGET" = "xsdxprairie" -o "x$som" = "xtrue"])
-AM_CONDITIONAL([MDM_PRONTO], [test "x$TARGET" = "xapq8017" -o "x$TARGET" = "xapq8053" -o "x$TARGET" = "xapq8016" -o "x$pronto" = "xtrue"])
+AC_ARG_ENABLE([cherokee],
+        [  --enable-cherokee Enable Cherokee],
+        [case "${enableval}" in
+            yes) cherokee=true ;;
+            no)  cherokee=false ;;
+            *) AC_MSG_ERROR([bad value ${enableval} for --enable-cherokee]) ;;
+        esac],[cherokee=false])
 
-AM_CONDITIONAL([MDM_CHEROKEE], [test "x$TARGET" = "xapq8098" -o "x$TARGET" = "xqcs605" -o "x$TARGET" = "xsdm845"])
+AM_CONDITIONAL([BT_ROME], [test "x$rome" = "xtrue" -o "x$som" = "xtrue"])
+AM_CONDITIONAL([BT_PRONTO], [test "x$pronto" = "xtrue"])
+AM_CONDITIONAL([BT_CHEROKEE], [test "x$cherokee" = "x$true"])
 
 # Checks for header files.
 AC_CHECK_HEADERS([fcntl.h stdlib.h string.h sys/socket.h sys/time.h termios.h unistd.h])
