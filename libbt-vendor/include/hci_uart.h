@@ -22,9 +22,15 @@
 #include <asm-generic/ioctls.h>
 
 #ifndef TIOCPMGET
+#ifdef TIOCPMGET_544D
+#define TIOCPMGET   0x544d  /* PM get */
+#define TIOCPMPUT   0x544e  /* PM put */
+#define TIOCPMACT   0x544f  /* PM is active */
+#else
 #define TIOCPMGET   0x5441  /* PM get */
 #define TIOCPMPUT   0x5442  /* PM put */
 #define TIOCPMACT   0x5443  /* PM is active */
+#endif
 #endif
 /* Variables to identify the platform */
 /*BT HS UART TTY DEVICE */
