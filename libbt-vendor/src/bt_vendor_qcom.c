@@ -258,7 +258,7 @@ static int get_bt_soc_type()
         }
     }
     else {
-        ALOGE("%s: Failed to get soc type", __FUNCTION__);
+        ALOGD("%s: Setting the default soc type", __FUNCTION__);
         ret = BT_SOC_DEFAULT;
     }
 #endif
