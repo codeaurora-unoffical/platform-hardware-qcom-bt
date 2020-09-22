@@ -72,6 +72,8 @@
 #define BT_VND_FILTER_START "wc_transport.start_hci"
 #endif
 
+#define ENABLE_IBS_PROPERTY "bluetooth.qca.enable_ibs"
+
 #define CMD_TIMEOUT  0x22
 
 #ifdef ANDROID
@@ -361,7 +363,7 @@ void stop_hci_filter() {
        if (strcmp(value, "0") == 0) {
            ALOGI("%s: hci_filter has been stopped already", __func__);
        } else if (BT_SOC_ROME == soc_type) {
-           ALOGI("%s: BT_SOC_ROME do not have wcnssfilter_ctrl channel", __func__);
+           ALOGI("%s: I do not have wcnssfilter_ctrl channel", __func__);
        }
        else {
            filter_ctrl = connect_to_local_socket(CTRL_SOCK);
@@ -992,7 +994,15 @@ userial_open:
                 int (*fd_array)[] = (int (*)[]) param;
                 int idx, fd = -1, fd_filter = -1;
 	        unified_hci = 0;
+		char prop_val[PROPERTY_VALUE_MAX];
+
                 ALOGI("bt-vendor : BT_VND_OP_USERIAL_OPEN");
+		memset(prop_val, 0x00, sizeof(prop_val));
+		property_get_bt(ENABLE_IBS_PROPERTY, prop_val, "true");
+		if (!strcmp(prop_val, "false"))
+			g_enable_ibs = 0;
+		ALOGI("%s: g_enable_ibs = %d", __func__, g_enable_ibs);
+
                 switch(q.soc_type)
                 {
                     case BT_SOC_DEFAULT:
@@ -1114,6 +1124,13 @@ userial_open:
                                     retval = -1;
                                 } else {
                                     ALOGV("rome_soc_init is completed");
+				    if (!g_enable_ibs) {
+					    retval = 1;
+					    for (idx=0; idx < CH_MAX; idx++)
+						    (*fd_array)[idx] = fd;
+					    ALOGI("%s: BT_VND_OP_USERIAL_OPEN Done due to IBS disabled", __func__);
+					    break;
+				    }
                                     property_set_bt("wc_transport.soc_initialized", "1");
                                     skip_init = false;
                                 }
@@ -1171,7 +1188,7 @@ userial_open:
                                 }
                             } else {
                                 if (q.soc_type == BT_SOC_ROME)
-                                    ALOGE("Failed to initialize ROME Controller!!!");
+                                    ALOGE("Failed to initialize Bluetooth Controller!!!");
                             }
 
                             if (fd >= 0) {
@@ -1550,7 +1567,7 @@ bool is_download_progress () {
     switch(q.soc_type)
     {
         case BT_SOC_ROME:
-            ALOGI("%s: ROME case", __func__);
+            ALOGI("%s", __func__);
             property_get_bt("wc_transport.patch_dnld_inprog", inProgress, "null");
             if(strcmp(inProgress,"null") == 0) {
                 retval = false;

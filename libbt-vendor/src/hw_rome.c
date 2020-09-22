@@ -81,6 +81,10 @@ unsigned char *phdr_buffer;
 unsigned char *pdata_buffer = NULL;
 patch_info rampatch_patch_info;
 int chipset_ver = 0;
+uint32_t g_product_id;
+uint32_t g_rom_ver;
+uint32_t g_soc_id;
+int g_enable_ibs = 1;
 unsigned char gTlv_type;
 unsigned char gTlv_dwndCfg;
 static unsigned int wipower_flag = 0;
@@ -101,6 +105,7 @@ static char btfw_nvm_path[MAX_BTFW_PATH];
 static const char *BT_FW_DIRS[] = {
 "/lib/firmware/updates",
 "/lib/firmware/image",
+"/lib/firmware/ar3k",
 "/firmware/image",
 NULL
 };
@@ -147,12 +152,9 @@ int get_vs_hci_event(unsigned char *rsp)
     int paramlen = 0;
     unsigned char EMBEDDED_MODE_CHECK = 0x02;
     FILE *btversionfile = 0;
-    unsigned int soc_id = 0;
-    unsigned int productid = 0;
     unsigned short patchversion = 0;
     char build_label[255];
     int build_lbl_len;
-    unsigned short buildversion = 0;
     unsigned int opcode = 0;
     unsigned char subOpcode = 0;
     unsigned int ocf = 0;
@@ -199,32 +201,32 @@ int get_vs_hci_event(unsigned char *rsp)
             case EDL_PATCH_VER_RES_EVT:
             case EDL_APP_VER_RES_EVT:
                  if (!unified_hci) {
-                   productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET + 3] << 24 |
+                   g_product_id = (uint32_t)(rsp[PATCH_PROD_ID_OFFSET + 3] << 24 |
                                              rsp[PATCH_PROD_ID_OFFSET + 2] << 16 |
                                              rsp[PATCH_PROD_ID_OFFSET + 1] << 8 |
                                              rsp[PATCH_PROD_ID_OFFSET]  );
                    patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET + 1] << 8 |
                                                   rsp[PATCH_PATCH_VER_OFFSET] );
-                   buildversion = (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET + 1] << 8 |
+                   g_rom_ver = (uint32_t)(rsp[PATCH_ROM_BUILD_VER_OFFSET + 1] << 8 |
                                rsp[PATCH_ROM_BUILD_VER_OFFSET] );
 
-                   ALOGI("\t Current Product ID\t\t: 0x%08x", productid);
+                   ALOGI("\t Current Product ID\t\t: 0x%08x", g_product_id);
                    ALOGI("\t Current Patch Version\t\t: 0x%04x", patchversion);
-                   ALOGI("\t Current ROM Build Version\t: 0x%04x", buildversion);
+                   ALOGI("\t Current ROM Build Version\t: 0x%04x", g_rom_ver);
 
                    if (paramlen - 10) {
-                     soc_id = (unsigned int)(rsp[PATCH_SOC_VER_OFFSET + 3] << 24 |
+                     g_soc_id = (uint32_t)(rsp[PATCH_SOC_VER_OFFSET + 3] << 24 |
                                             rsp[PATCH_SOC_VER_OFFSET + 2] << 16 |
                                             rsp[PATCH_SOC_VER_OFFSET + 1] << 8 |
                                             rsp[PATCH_SOC_VER_OFFSET] );
-                     ALOGI("\t Current SOC Version\t\t: 0x%08x", soc_id);
+                     ALOGI("\t Current SOC Version\t\t: 0x%08x", g_soc_id);
                    }
                  } else {
-                   productid = (unsigned int)(rsp[PATCH_PROD_ID_OFFSET_UNIFIED + 3] << 24 |
+                   g_product_id = (uint32_t)(rsp[PATCH_PROD_ID_OFFSET_UNIFIED + 3] << 24 |
                                              rsp[PATCH_PROD_ID_OFFSET_UNIFIED + 2] << 16 |
                                              rsp[PATCH_PROD_ID_OFFSET_UNIFIED + 1] << 8 |
                                              rsp[PATCH_PROD_ID_OFFSET_UNIFIED]  );
-                   ALOGI("\t unified Current Product ID\t\t: 0x%08x", productid);
+                   ALOGI("\t unified Current Product ID\t\t: 0x%08x", g_product_id);
 
                    /* Patch Version indicates FW patch version */
                    patchversion = (unsigned short)(rsp[PATCH_PATCH_VER_OFFSET_UNIFIED + 1] << 8 |
@@ -232,25 +234,25 @@ int get_vs_hci_event(unsigned char *rsp)
                    ALOGI("\t unified Current Patch Version\t\t: 0x%04x", patchversion);
 
                    /* ROM Build Version indicates ROM build version like 1.0/1.1/2.0 */
-                   buildversion =
-                         (int)(rsp[PATCH_ROM_BUILD_VER_OFFSET_UNIFIED + 1] << 8 |
+                   g_rom_ver =
+                         (uint32_t)(rsp[PATCH_ROM_BUILD_VER_OFFSET_UNIFIED + 1] << 8 |
                                rsp[PATCH_ROM_BUILD_VER_OFFSET_UNIFIED] );
-                   ALOGI("\t unified Current ROM Build Version\t: 0x%04x", buildversion);
+                   ALOGI("\t unified Current ROM Build Version\t: 0x%04x", g_rom_ver);
 
                    if ((paramlen - 14) > 0) {
-                     soc_id =
-                           (unsigned int)(rsp[PATCH_SOC_VER_OFFSET_UNIFIED + 3] << 24 |
+                     g_soc_id =
+                           (uint32_t)(rsp[PATCH_SOC_VER_OFFSET_UNIFIED + 3] << 24 |
                                            rsp[PATCH_SOC_VER_OFFSET_UNIFIED + 2] << 16 |
                                            rsp[PATCH_SOC_VER_OFFSET_UNIFIED + 1] << 8 |
                                            rsp[PATCH_SOC_VER_OFFSET_UNIFIED]  );
-                     ALOGI("\t unified Current SOC Version\t\t: 0x%08x", soc_id);
+                     ALOGI("\t unified Current SOC Version\t\t: 0x%08x", g_soc_id);
                    }
                  }
                  if (NULL != (btversionfile = fopen(BT_VERSION_FILEPATH, "wb"))) {
-                   fprintf(btversionfile, "Bluetooth Controller Product ID    : 0x%08x\n", productid);
+                   fprintf(btversionfile, "Bluetooth Controller Product ID    : 0x%08x\n", g_product_id);
                    fprintf(btversionfile, "Bluetooth Controller Patch Version : 0x%04x\n", patchversion);
-                   fprintf(btversionfile, "Bluetooth Controller Build Version : 0x%04x\n", buildversion);
-                   fprintf(btversionfile, "Bluetooth Controller SOC Version   : 0x%08x\n", soc_id);
+                   fprintf(btversionfile, "Bluetooth Controller Build Version : 0x%04x\n", g_rom_ver);
+                   fprintf(btversionfile, "Bluetooth Controller SOC Version   : 0x%08x\n", g_soc_id);
                    fclose(btversionfile);
                  } else {
                    ALOGE("Failed to dump SOC version info. Errno:%d", errno);
@@ -258,7 +260,7 @@ int get_vs_hci_event(unsigned char *rsp)
                 /* Rome Chipset Version can be decided by Patch version and SOC version,
                 Upper 2 bytes will be used for Patch version and Lower 2 bytes will be
                 used for SOC as combination for BT host driver */
-                chipset_ver = (buildversion << 16) |(soc_id & 0x0000ffff);
+                chipset_ver = (g_rom_ver << 16) |(g_soc_id & 0x0000ffff);
 
                 break;
             case EDL_PATCH_TLV_REQ_CMD:
@@ -363,7 +365,7 @@ int get_vs_hci_event(unsigned char *rsp)
             }
             break;
         case HCI_VS_STRAY_EVT:
-	    if (IS_HASTINGS_SOC(chipset_ver)) {
+	    if (IS_HASTINGS_SOC() || IS_HSP_SOC()) {
 		    if (unified_hci) {
 			    err = status ? -1 : 0;
 			    ALOGI("%s: CCE for controller log, status = 0x%x, subOpcode = 0x%x", __func__, status, subOpcode);
@@ -946,7 +948,6 @@ error:
 
 void update_new_nvm_format(tlv_nvm_hdr *nvm)
 {
-  int enable_ibs = 1;
   uint8_t *nvm_byte_ptr = (uint8_t *)nvm;
 
   if (!nvm)
@@ -965,7 +966,7 @@ void update_new_nvm_format(tlv_nvm_hdr *nvm)
 
   /* Update Tag#27: SIBS Settings */
   if (nvm->tag_id == 27) {
-    if (!enable_ibs) {
+    if (!g_enable_ibs) {
       /* TxP Sleep Mode: Disable */
       *(nvm_byte_ptr + 1) &= ~0x01;
       ALOGI("%s: SIBS Disable", __func__);
@@ -1076,7 +1077,7 @@ int rome_get_tlv_file(char *file_path)
                     *(nvm_byte_ptr+3), *(nvm_byte_ptr+4), *(nvm_byte_ptr+5));
             }
 
-            if (IS_HASTINGS_SOC(chipset_ver)) {
+            if (IS_HASTINGS_SOC() || IS_HSP_SOC()) {
                 update_new_nvm_format(nvm_ptr);
             }
 
@@ -1195,6 +1196,12 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
                 } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
                     wait_vsc_evt = !remain_size ? TRUE: FALSE;
                  }
+	    } else if ((IS_HASTINGS_SOC() || IS_HSP_SOC()) && (gTlv_type == TLV_TYPE_PATCH)){
+		    if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
+			    wait_cc_evt = !remain_size ? FALSE: TRUE;
+		    } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
+			    wait_vsc_evt = !remain_size ? TRUE: FALSE;
+		    }
             } else if ((chipset_ver >= ROME_VER_1_1) && (chipset_ver < ROME_VER_3_2) && (gTlv_type == TLV_TYPE_PATCH)) {
                /* If the Rome version is from 1.1 to 3.1
                 * 1. No CCE for the last command segment but all other segment
@@ -1234,7 +1241,7 @@ int rome_tlv_dnld_req(int fd, int tlv_size)
         } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
             wait_vsc_evt = remain_size ? TRUE: FALSE;
         }
-    } else if (IS_HASTINGS_SOC(chipset_ver) && (gTlv_type == TLV_TYPE_PATCH)) {
+    } else if ((IS_HASTINGS_SOC() || IS_HSP_SOC()) && (gTlv_type == TLV_TYPE_PATCH)) {
         if (gTlv_dwndCfg == ROME_SKIP_EVT_NONE) {
             wait_cc_evt = remain_size ? FALSE: TRUE;
         } else if (gTlv_dwndCfg == ROME_SKIP_EVT_VSE_CC) {
@@ -1980,7 +1987,7 @@ void enable_controller_log (int fd, unsigned char wait_for_evt)
    if (wait_for_evt)
        goto end;
 
-   if (!unified_hci || IS_HASTINGS_SOC(chipset_ver)) {
+   if (!unified_hci || IS_HASTINGS_SOC() || IS_HSP_SOC()) {
       ret = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
       if (ret < 0) {
           ALOGE("%s: Failed to get CC for enable SoC log", __FUNCTION__);
@@ -2145,32 +2152,6 @@ int rome_soc_init(int fd, char *bdaddr)
             //rome_ver = ROME_VER_3_2;	// SET to ROME 3.2 as the patch downloading workflow is same as Rome 3.2
             //ALOGD(" set rome_ver to ROME_VER_3_2\n");
             goto download;
-        case HASTINGS_VER_1_0:
-        case HASTINGS_VER_1_0_1:
-        case HASTINGS_VER_1_1:
-            if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
-                rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_1_0_PATH;
-            else
-                rampatch_file_path = btfw_rampatch_path;
-
-            if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
-                nvm_file_path = HASTINGS_NVM_TLV_UART_1_0_PATH;
-            else
-                nvm_file_path = btfw_nvm_path;
-
-            goto download;
-        case HASTINGS_VER_2_0:
-           if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_2_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
-               rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_2_0_PATH;
-           else
-               rampatch_file_path = btfw_rampatch_path;
-
-           if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_2_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
-               nvm_file_path = HASTINGS_NVM_TLV_UART_2_0_PATH;
-           else
-               nvm_file_path = btfw_nvm_path;
-
-           goto download;
         case ROME_VER_2_1:
             rampatch_file_path = ROME_RAMPATCH_TLV_2_0_1_PATH;
             nvm_file_path = ROME_NVM_TLV_2_0_1_PATH;
@@ -2239,6 +2220,57 @@ download:
 
             break;
         default:
+	    if (IS_HASTINGS_SOC()) {
+		    if (g_rom_ver == HASTINGS_PATCH_VER_0200) {
+			    if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_2_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+				    rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_2_0_PATH;
+			    else
+				    rampatch_file_path = btfw_rampatch_path;
+
+			    if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_2_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+				    nvm_file_path = HASTINGS_NVM_TLV_UART_2_0_PATH;
+			    else
+				    nvm_file_path = btfw_nvm_path;
+		    } else {
+			    if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+				    rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_1_0_PATH;
+			    else
+				    rampatch_file_path = btfw_rampatch_path;
+
+			    if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+				    nvm_file_path = HASTINGS_NVM_TLV_UART_1_0_PATH;
+			    else
+				    nvm_file_path = btfw_nvm_path;
+		    }
+
+		    goto download;
+	    }else if (IS_HSP_SOC()) {
+		    if (g_rom_ver == HSP_PATCH_VER_0200) {
+			    if (get_btfw_path(basename(HSP_RAMPATCH_TLV_UART_2_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+				    rampatch_file_path = HSP_RAMPATCH_TLV_UART_2_0_PATH;
+			    else
+				    rampatch_file_path = btfw_rampatch_path;
+
+			    if (get_btfw_path(basename(HSP_NVM_TLV_UART_2_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+				    nvm_file_path = HSP_NVM_TLV_UART_2_0_PATH;
+			    else
+				    nvm_file_path = btfw_nvm_path;
+
+		    } else {
+			    if (get_btfw_path(basename(HSP_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
+				    rampatch_file_path = HSP_RAMPATCH_TLV_UART_1_0_PATH;
+			    else
+				    rampatch_file_path = btfw_rampatch_path;
+
+			    if (get_btfw_path(basename(HSP_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
+				    nvm_file_path = HSP_NVM_TLV_UART_1_0_PATH;
+			    else
+				    nvm_file_path = btfw_nvm_path;
+		    }
+
+		    goto download;
+
+	    }
             ALOGI("%s: Detected unknown SoC version: 0x%08x", __FUNCTION__, chipset_ver);
             err = -1;
             break;
@@ -2248,4 +2280,41 @@ error:
     dnld_fd = -1;
     ALOGI("Exit %s : unified_hci = %d, wait_vsc_evt = %d, err = %d", __func__, unified_hci, wait_vsc_evt, err);
     return err;
+}
+
+int IS_HASTINGS_SOC(void)
+{
+	if ((g_product_id & 0xffff) != (PROD_ID_HASTINGS & 0xffff))
+		return 0;
+
+	if ((g_soc_id == HASTINGS_SOC_ID_0100) && (g_rom_ver == HASTINGS_PATCH_VER_0100))
+		return 1;
+
+	if ((g_soc_id == HASTINGS_SOC_ID_0101) && (g_rom_ver == HASTINGS_PATCH_VER_0100))
+		return 1;
+
+	if ((g_soc_id == HASTINGS_SOC_ID_0110) && (g_rom_ver == HASTINGS_PATCH_VER_0100))
+		return 1;
+
+	if ((g_soc_id == HASTINGS_SOC_ID_0200) && (g_rom_ver == HASTINGS_PATCH_VER_0200))
+		return 1;
+
+	return 0;
+}
+
+int IS_HSP_SOC(void)
+{
+	if ((g_product_id & 0xffff) != (PROD_ID_HSP & 0xffff))
+		return 0;
+
+	if ((g_soc_id == HSP_SOC_ID_0100) && (g_rom_ver == HSP_PATCH_VER_0100))
+		return 1;
+
+	if ((g_soc_id == HSP_SOC_ID_0110) && (g_rom_ver == HSP_PATCH_VER_0100))
+		return 1;
+
+	if ((g_soc_id == HSP_SOC_ID_0200) && (g_rom_ver == HSP_PATCH_VER_0200))
+		return 1;
+
+	return 0;
 }

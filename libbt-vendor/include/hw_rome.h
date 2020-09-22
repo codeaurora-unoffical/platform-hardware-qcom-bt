@@ -206,6 +206,11 @@
 #define HASTINGS_NVM_TLV_UART_2_0_PATH         "/lib/firmware/image/htnv20.bin"
 #endif
 
+#define HSP_RAMPATCH_TLV_UART_1_0_PATH    "/lib/firmware/image/hpbtfw10.tlv"
+#define HSP_NVM_TLV_UART_1_0_PATH         "/lib/firmware/image/hpnv10.bin"
+#define HSP_RAMPATCH_TLV_UART_2_0_PATH    "/lib/firmware/image/hpbtfw20.tlv"
+#define HSP_NVM_TLV_UART_2_0_PATH         "/lib/firmware/image/hpnv20.bin"
+
 #define ROME_3_1_FW_SU  "bprm.cnss.3.1"
 #define ROME_3_2_FW_SU  "btfwp.cnss.3.2"
 
@@ -299,29 +304,39 @@ enum{
     BAUDRATE_Reserved  = 0xFF
 };
 
-enum{
-    NAPLES_PATCH_VER_0100 = 0x0100,
-    HASTINGS_PATCH_VER_0100 = 0x0100,
-    HASTINGS_PATCH_VER_0200 = 0x0200,
-    ROME_PATCH_VER_0100 = 0x0100,
-    ROME_PATCH_VER_0101 = 0x0101,
-    ROME_PATCH_VER_0200 = 0x0200,
-    ROME_PATCH_VER_0300 = 0x0300,
-    ROME_PATCH_VER_0302 = 0x0302
- };
+enum {
+	PROD_ID_HASTINGS = 0x10,
+	PROD_ID_HSP = 0x13
+};
 
 enum{
-    ROME_SOC_ID_00 = 0x00000000,
-    ROME_SOC_ID_11 = 0x00000011,
-    ROME_SOC_ID_13 = 0x00000013,
-    ROME_SOC_ID_22 = 0x00000022,
-    ROME_SOC_ID_23 = 0x00000023,
-    ROME_SOC_ID_44 = 0x00000044,
-    NAPLES_SOC_ID_15 = 0x00000015,
-    HASTINGS_SOC_ID_0100 = 0x00000100,
-    HASTINGS_SOC_ID_0101 = 0x00000101,
-    HASTINGS_SOC_ID_0110 = 0x00000110,
-    HASTINGS_SOC_ID_0200 = 0x00000200
+	NAPLES_PATCH_VER_0100 = 0x0100,
+	HASTINGS_PATCH_VER_0100 = 0x0100,
+	HASTINGS_PATCH_VER_0200 = 0x0200,
+	HSP_PATCH_VER_0100 = 0x0100,
+	HSP_PATCH_VER_0200 = 0x0200,
+	ROME_PATCH_VER_0100 = 0x0100,
+	ROME_PATCH_VER_0101 = 0x0101,
+	ROME_PATCH_VER_0200 = 0x0200,
+	ROME_PATCH_VER_0300 = 0x0300,
+	ROME_PATCH_VER_0302 = 0x0302
+};
+
+enum{
+	ROME_SOC_ID_00 = 0x00000000,
+	ROME_SOC_ID_11 = 0x00000011,
+	ROME_SOC_ID_13 = 0x00000013,
+	ROME_SOC_ID_22 = 0x00000022,
+	ROME_SOC_ID_23 = 0x00000023,
+	ROME_SOC_ID_44 = 0x00000044,
+	NAPLES_SOC_ID_15 = 0x00000015,
+	HASTINGS_SOC_ID_0100 = 0x400A0100,
+	HASTINGS_SOC_ID_0101 = 0x400A0101,
+	HASTINGS_SOC_ID_0110 = 0x400A0110,
+	HASTINGS_SOC_ID_0200 = 0x400A0200,
+	HSP_SOC_ID_0100 = 0x400C0100,
+	HSP_SOC_ID_0110 = 0x400C0110,
+	HSP_SOC_ID_0200 = 0x400C0200
 };
 
 enum{
@@ -334,17 +349,18 @@ enum{
     ROME_VER_3_2 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_44 ),
     TUFELLO_VER_1_0 = ((ROME_PATCH_VER_0300 << 16 ) | ROME_SOC_ID_13 ),
     TUFELLO_VER_1_1 = ((ROME_PATCH_VER_0302 << 16 ) | ROME_SOC_ID_23 ),
-    NAPLES_VER_1_0 = ((NAPLES_PATCH_VER_0100 << 16 ) | NAPLES_SOC_ID_15 ),
-    HASTINGS_VER_1_0 = ((HASTINGS_PATCH_VER_0100 << 16 ) | HASTINGS_SOC_ID_0100),
-    HASTINGS_VER_1_0_1 = ((HASTINGS_PATCH_VER_0100 << 16 ) | HASTINGS_SOC_ID_0101),
-    HASTINGS_VER_1_1 = ((HASTINGS_PATCH_VER_0100 << 16 ) | HASTINGS_SOC_ID_0110),
-    HASTINGS_VER_2_0 = ((HASTINGS_PATCH_VER_0200 << 16 ) | HASTINGS_SOC_ID_0200)
+    NAPLES_VER_1_0 = ((NAPLES_PATCH_VER_0100 << 16 ) | NAPLES_SOC_ID_15 )
 };
 
-#define IS_HASTINGS_SOC(v) (((v) == HASTINGS_VER_1_0) || ((v) == HASTINGS_VER_1_0_1) || ((v) == HASTINGS_VER_1_1) || ((v) == HASTINGS_VER_2_0))
-
+extern uint32_t g_product_id;
+extern uint32_t g_rom_ver;
+extern uint32_t g_soc_id;
+extern int chipset_ver;
+extern int g_enable_ibs;
 
 //declarations
+int IS_HASTINGS_SOC(void);
+int IS_HSP_SOC(void);
 int rome_soc_init(int fd, char *bdaddr);
 int check_embedded_mode(int fd);
 int rome_get_addon_feature_list(int fd);
