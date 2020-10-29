@@ -85,6 +85,8 @@ uint32_t g_product_id;
 uint32_t g_rom_ver;
 uint32_t g_soc_id;
 int g_enable_ibs = 1;
+static int dl_fw_bid_enable = 0;
+static unsigned char board_id_str[16];
 unsigned char gTlv_type;
 unsigned char gTlv_dwndCfg;
 static unsigned int wipower_flag = 0;
@@ -117,6 +119,60 @@ NULL
 /*****************************************************************************
 **   Functions
 *****************************************************************************/
+static unsigned char convert_2_ascii(unsigned char temp)
+{
+	unsigned char n = temp;
+
+	if (n <= 9)
+		n = n + 0x30;
+	else
+		n = n + 0x57;
+	return n;
+}
+
+static int get_btfw_path(char *name, char *path, int path_size)
+{
+	int l;
+	char **p = BT_FW_DIRS;
+	char *b = name;
+
+	while (*p) {
+		l = snprintf(path, path_size, "%s/%s", *p, b);
+		if (l < path_size) {
+			if (!access(path, R_OK)) {
+				ALOGI("in %s : name = %s path = %s\n", __func__, name, path);
+				return 0;
+			}
+		}
+		p++;
+	}
+	return -1;
+}
+
+static int get_nvm_path_bid(char *nvm_name, char *nvm_path, int nvm_path_size)
+{
+	int len;
+	char nvm_base[MAX_BTFW_PATH];
+	char nvm_bid[MAX_BTFW_PATH];
+	char nvm_path_output[MAX_BTFW_PATH];
+
+	snprintf(nvm_base, sizeof(nvm_base), "%s", basename(nvm_name));
+
+	/*NVM FILE pattern such as hpnv20.b40*/
+	len = snprintf(nvm_bid, sizeof(nvm_bid), "%s", nvm_base);
+	len -= 2;
+	snprintf(nvm_bid + len, sizeof(nvm_bid) - len, "%s", board_id_str);
+	if (!get_btfw_path(nvm_bid, nvm_path_output, sizeof(nvm_path_output))) {
+		snprintf(nvm_path, nvm_path_size, "%s", nvm_path_output);
+		return 0;
+	}
+	if (!get_btfw_path(nvm_base, nvm_path_output, sizeof(nvm_path_output))) {
+		snprintf(nvm_path, nvm_path_size, "%s", nvm_path_output);
+		return 0;
+	}
+	return -1;
+}
+
 int do_write(int fd, unsigned char *buf,int len)
 {
     int ret = 0;
@@ -314,6 +370,51 @@ int get_vs_hci_event(unsigned char *rsp)
                     ALOGI("Failed to dump  FW SU build info. Errno:%d", errno);
                 }
             break;
+            case EDL_GET_BOARD_ID:
+              {
+                uint8_t msbBoardId = 0;
+                uint8_t lsbBoardId = 0;
+                uint8_t boardIdLen = 0;
+                memset(board_id_str, 0x00, sizeof(board_id_str));
+
+                paramlen = (uint8_t)rsp[EVT_PLEN];
+                if (unified_hci) {
+                  if (paramlen < 8) {
+                    ALOGE("%s: Invalid Param Len in BoardId rsp:%d!!", __func__, paramlen);
+                    break;
+                  }
+                  boardIdLen = (uint8_t)rsp[8];
+                  msbBoardId = (uint8_t)rsp[9];
+                  lsbBoardId = (uint8_t)rsp[10];
+                } else {
+                  if (paramlen < 5) {
+                    ALOGE("%s: Invalid Param Len in BoardId rsp:%d!!", __func__, paramlen);
+                    break;
+                  }
+                  boardIdLen = (uint8_t)rsp[5];
+                  msbBoardId = (uint8_t)rsp[6];
+                  lsbBoardId = (uint8_t)rsp[7];
+                }
+
+                if (boardIdLen != 2) {
+                  ALOGI("%s: Invalid Board Id Len %d!!", __func__, boardIdLen);
+                  break;
+                }
+
+                ALOGI("%s: Board Id %x %x!!", __func__, msbBoardId, lsbBoardId);
+                if (msbBoardId == 0x00) {
+                  board_id_str[0] = convert_2_ascii((lsbBoardId & 0xF0) >> 4);
+                  board_id_str[1] = convert_2_ascii(lsbBoardId & 0x0F);
+                  board_id_str[2] = '\0';
+                } else {
+                  board_id_str[0] = convert_2_ascii((msbBoardId & 0xF0) >> 4);
+                  board_id_str[1] = convert_2_ascii(msbBoardId & 0x0F);
+                  board_id_str[2] = convert_2_ascii((lsbBoardId & 0xF0) >> 4);
+                  board_id_str[3] = convert_2_ascii(lsbBoardId & 0x0F);
+                  board_id_str[4] = '\0';
+                }
+              }
+              break;
         }
         break;
 
@@ -626,9 +727,49 @@ void frame_hci_cmd_pkt(
             ALOGD("HCI-CMD %d:\t0x%x \t0x%x \t0x%x \t0x%x \t0x%x",
                 segtNo, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4]);
             break;
+        case EDL_GET_BOARD_ID:
+            ALOGD("%s: Sending EDL_GET_BOARD_ID", __func__);
+            ALOGD("HCI-CMD %d:\t0x%x \t0x%x \t0x%x \t0x%x \t0x%x",
+            segtNo, cmd[0], cmd[1], cmd[2], cmd[3], cmd[4]);
+            break;
         default:
             ALOGE("%s: Unknown EDL CMD !!!", __FUNCTION__);
     }
+}
+
+static int get_board_id_req( int fd)
+{
+	int size, err = 0;
+	unsigned char cmd[HCI_MAX_CMD_SIZE];
+	unsigned char rsp[HCI_MAX_EVENT_SIZE];
+	bool cmd_supported = true;
+	unsigned char wait_vsc_evt_old;
+
+	wait_vsc_evt_old = wait_vsc_evt;
+	wait_vsc_evt = TRUE;
+
+	/* Frame the HCI CMD to be sent to the Controller */
+	frame_hci_cmd_pkt(cmd, EDL_GET_BOARD_ID, 0,
+			  -1, EDL_PATCH_CMD_LEN);
+	/* Total length of the packet to be sent to the Controller */
+	size = (HCI_CMD_IND + HCI_COMMAND_HDR_SIZE + EDL_PATCH_CMD_LEN);
+
+	ALOGI("%s: Sending EDL_GET_BOARD_ID", __func__);
+	err = hci_send_vs_cmd(fd, (unsigned char*)cmd, rsp, size);
+	if ( err != size) {
+		ALOGE("Failed to send EDL_GET_BOARD_ID command!");
+		cmd_supported = false;
+	}
+
+	if (!unified_hci) {
+		err = read_hci_event(fd, rsp, HCI_MAX_EVENT_SIZE);
+		if (err < 0) {
+			ALOGE("%s: Failed to get feature request", __func__);
+		}
+	}
+
+	wait_vsc_evt = wait_vsc_evt_old;
+	return (cmd_supported == true ? err : -1);
 }
 
 void rome_extract_patch_header_info(unsigned char *buf)
@@ -1292,6 +1433,11 @@ int rome_download_tlv_file(int fd)
         pdata_buffer = NULL;
     }
 nvm_download:
+    if (dl_fw_bid_enable)
+	    if (get_board_id_req(fd) >= 0)
+		    get_nvm_path_bid(nvm_file_path, btfw_nvm_path, sizeof(btfw_nvm_path));
+    ALOGI("%s: NVM FILE is %s", __func__, nvm_file_path);
+
     if(!nvm_file_path) {
         ALOGI("%s: nvm file is not available", __FUNCTION__);
         err = 0; // in case of nvm/rampatch is not available
@@ -2039,25 +2185,6 @@ static int disable_internal_ldo(int fd)
     return ret;
 }
 
-static int get_btfw_path(char *name, char *path, int path_size)
-{
-    int l;
-    char **p = BT_FW_DIRS;
-    char *b = name;
-
-    while (*p) {
-        l = snprintf(path, path_size, "%s/%s", *p, b);
-        if (l < path_size) {
-            if (!access(path, R_OK)) {
-                ALOGI("in %s : name = %s path = %s\n", __func__, name, path);
-                return 0;
-            }
-        }
-        p++;
-    }
-    return -1;
-}
-
 int rome_soc_init(int fd, char *bdaddr)
 {
     int err = -1, size = 0;
@@ -2083,6 +2210,10 @@ int rome_soc_init(int fd, char *bdaddr)
     }
 
     ALOGI("%s: Chipset Version (0x%08x)", __FUNCTION__, chipset_ver);
+
+    if (IS_HASTINGS_SOC() || IS_HSP_SOC())
+	    dl_fw_bid_enable = 1;
+    ALOGI("%s: dl_fw_bid_enable = %d", __func__, dl_fw_bid_enable);
 
     switch (chipset_ver){
         case ROME_VER_1_0:
@@ -2219,57 +2350,37 @@ download:
             ALOGI("HCI Reset is done\n");
 
             break;
-        default:
+	default:
 	    if (IS_HASTINGS_SOC()) {
+		    rampatch_file_path = btfw_rampatch_path;
+		    nvm_file_path = btfw_nvm_path;
 		    if (g_rom_ver == HASTINGS_PATCH_VER_0200) {
 			    if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_2_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
-				    rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_2_0_PATH;
-			    else
-				    rampatch_file_path = btfw_rampatch_path;
-
+				    snprintf(btfw_rampatch_path, sizeof(btfw_rampatch_path), "%s", HASTINGS_RAMPATCH_TLV_UART_2_0_PATH);
 			    if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_2_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
-				    nvm_file_path = HASTINGS_NVM_TLV_UART_2_0_PATH;
-			    else
-				    nvm_file_path = btfw_nvm_path;
+				    snprintf(btfw_nvm_path, sizeof(btfw_nvm_path), "%s", HASTINGS_NVM_TLV_UART_2_0_PATH);
 		    } else {
 			    if (get_btfw_path(basename(HASTINGS_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
-				    rampatch_file_path = HASTINGS_RAMPATCH_TLV_UART_1_0_PATH;
-			    else
-				    rampatch_file_path = btfw_rampatch_path;
-
+				    snprintf(btfw_rampatch_path, sizeof(btfw_rampatch_path), "%s", HASTINGS_RAMPATCH_TLV_UART_1_0_PATH);
 			    if (get_btfw_path(basename(HASTINGS_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
-				    nvm_file_path = HASTINGS_NVM_TLV_UART_1_0_PATH;
-			    else
-				    nvm_file_path = btfw_nvm_path;
+				    snprintf(btfw_nvm_path, sizeof(btfw_nvm_path), "%s", HASTINGS_NVM_TLV_UART_1_0_PATH);
 		    }
-
 		    goto download;
-	    }else if (IS_HSP_SOC()) {
+	    } else if (IS_HSP_SOC()) {
+		    rampatch_file_path = btfw_rampatch_path;
+		    nvm_file_path = btfw_nvm_path;
 		    if (g_rom_ver == HSP_PATCH_VER_0200) {
 			    if (get_btfw_path(basename(HSP_RAMPATCH_TLV_UART_2_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
-				    rampatch_file_path = HSP_RAMPATCH_TLV_UART_2_0_PATH;
-			    else
-				    rampatch_file_path = btfw_rampatch_path;
-
+				    snprintf(btfw_rampatch_path, sizeof(btfw_rampatch_path), "%s", HSP_RAMPATCH_TLV_UART_2_0_PATH);
 			    if (get_btfw_path(basename(HSP_NVM_TLV_UART_2_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
-				    nvm_file_path = HSP_NVM_TLV_UART_2_0_PATH;
-			    else
-				    nvm_file_path = btfw_nvm_path;
-
+				    snprintf(btfw_nvm_path, sizeof(btfw_nvm_path), "%s", HSP_NVM_TLV_UART_2_0_PATH);
 		    } else {
 			    if (get_btfw_path(basename(HSP_RAMPATCH_TLV_UART_1_0_PATH), btfw_rampatch_path, sizeof(btfw_rampatch_path)))
-				    rampatch_file_path = HSP_RAMPATCH_TLV_UART_1_0_PATH;
-			    else
-				    rampatch_file_path = btfw_rampatch_path;
-
+				    snprintf(btfw_rampatch_path, sizeof(btfw_rampatch_path), "%s", HSP_RAMPATCH_TLV_UART_1_0_PATH);
 			    if (get_btfw_path(basename(HSP_NVM_TLV_UART_1_0_PATH), btfw_nvm_path, sizeof(btfw_nvm_path)))
-				    nvm_file_path = HSP_NVM_TLV_UART_1_0_PATH;
-			    else
-				    nvm_file_path = btfw_nvm_path;
+				    snprintf(btfw_nvm_path, sizeof(btfw_nvm_path), "%s", HSP_NVM_TLV_UART_1_0_PATH);
 		    }
-
 		    goto download;
-
 	    }
             ALOGI("%s: Detected unknown SoC version: 0x%08x", __FUNCTION__, chipset_ver);
             err = -1;
