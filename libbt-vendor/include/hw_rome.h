@@ -88,6 +88,7 @@
 #define EDL_SET_BAUDRATE_CMD_OCF        (0x48)
 #define EDL_WIPOWER_VS_CMD_OCF          (0x1f)
 #define HCI_VS_GET_ADDON_FEATURES_SUPPORT   (0x1d)
+#define EDL_GET_BOARD_ID                     (0x23)
 
 /* VS Commands */
 #define VSC_SET_BAUDRATE_REQ_LEN        (1)
