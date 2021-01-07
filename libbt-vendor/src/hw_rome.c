@@ -62,7 +62,7 @@ extern "C" {
 #ifdef ANDROID
 #define BT_VERSION_FILEPATH "/data/misc/bluedroid/bt_fw_version.txt"
 #else
-#define BT_VERSION_FILEPATH "/etc/data/misc/bluedroid/bt_fw_version.txt"
+#define BT_VERSION_FILEPATH "/data/misc/bluedroid/bt_fw_version.txt"
 #endif
 
 #ifdef __cplusplus
@@ -212,7 +212,7 @@ int get_vs_hci_event(unsigned char *rsp)
                    ALOGI("\t Current Patch Version\t\t: 0x%04x", patchversion);
                    ALOGI("\t Current ROM Build Version\t: 0x%04x", buildversion);
 
-                   if (paramlen - 10) {
+                   if ((paramlen - 10) >= 4) {
                      soc_id = (unsigned int)(rsp[PATCH_SOC_VER_OFFSET + 3] << 24 |
                                             rsp[PATCH_SOC_VER_OFFSET + 2] << 16 |
                                             rsp[PATCH_SOC_VER_OFFSET + 1] << 8 |
@@ -258,7 +258,7 @@ int get_vs_hci_event(unsigned char *rsp)
                 /* Rome Chipset Version can be decided by Patch version and SOC version,
                 Upper 2 bytes will be used for Patch version and Lower 2 bytes will be
                 used for SOC as combination for BT host driver */
-                chipset_ver = (buildversion << 16) |(soc_id & 0x0000ffff);
+                chipset_ver = (buildversion << 16) | (soc_id & 0x0000ffff);
 
                 break;
             case EDL_PATCH_TLV_REQ_CMD:
